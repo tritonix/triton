@@ -5,10 +5,15 @@ Copyright (c) 2014-2018 The Monero Project.
 Portions Copyright (c) 2012-2013 The Cryptonote developers.
 
 ## Introduction
-Triton is a Monero forked cryptocurrency which aims to be truly decentralised. Triton comes with
-all features Monero has, privacy, ASIC resistance mining algorithm, Bulletproofs which significantly reduce transaction fees.
+ Triton is a Monero forked cryptocurrency that aims to be truly decentralized. It comes with all
+features Monero has in version 0.13.0. Privacy, ASIC resistance, bulletproof, which significantly
+reduces transaction fee. And to ensure the resistance to ASIC, Triton will follow Monero's mining algorithm updates.
+ The purpose of Triton is to show how a digital currency can be truly decentralized. More specifically
+decentralizing hash power.
+ To do this, Triton's new protocol will converge each miners hash rate to a valid point. Every miner
+will have a unique miner id which cannot be arbitrarily manipulated, and different difficulties that depend on their hash power.
 
-##Build
+## Build
 The following table summarizes the tools and libraries required to build. A
 few of the libraries are also included in this repository (marked as
 "Vendored"). By default, the build uses the library installed on the system,
@@ -65,13 +70,13 @@ invokes cmake commands as needed.
 #### On Linux and OS X
 
 * Install the dependencies
-
-        cd triton
-        mkdir build
-        cd build
-        cmake ..
-        make
-
+* Build:
+```     
+        $ mkdir build
+        $ cd build
+        $ cmake ..
+        $ make
+```
     *Optional*: If your machine has several cores and enough memory, enable
     parallel build by running `make -j<number of threads>` instead of `make`. For
     this to be worthwhile, the machine should have one core and about 2GB of RAM
@@ -116,10 +121,10 @@ Tested on a Raspberry Pi Zero with a clean install of minimal Raspbian Stretch (
 ```
 * Build:
 ```     
-        mkdir build
-        cd build
-        cmake ..
-        make
+        $ mkdir build
+        $ cd build
+        $ cmake ..
+        $ make
 ```
 * Wait 4-6 hours
 
