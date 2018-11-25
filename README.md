@@ -8,7 +8,7 @@ Portions Copyright (c) 2012-2013 The Cryptonote developers.
 Triton is a Monero forked cryptocurrency which aims to be truly decentralised. Triton comes with
 all features Monero has, privacy, ASIC resistance mining algorithm, Bulletproofs which significantly reduce transaction fees.
 
-##Build
+## Build
 The following table summarizes the tools and libraries required to build. A
 few of the libraries are also included in this repository (marked as
 "Vendored"). By default, the build uses the library installed on the system,
@@ -65,7 +65,7 @@ invokes cmake commands as needed.
 #### On Linux and OS X
 
 * Install the dependencies
-
+* Build
         cd triton
         mkdir build
         cd build
