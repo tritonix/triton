@@ -66,12 +66,12 @@ invokes cmake commands as needed.
 
 * Install the dependencies
 * Build:
-        `$ cd triton `
-        `$ mkdir build `
-        `$ cd build `
-        `$ cmake .. `
-        `$ make `
-
+```     
+        $ mkdir build
+        $ cd build
+        $ cmake ..
+        $ make
+```
     *Optional*: If your machine has several cores and enough memory, enable
     parallel build by running `make -j<number of threads>` instead of `make`. For
     this to be worthwhile, the machine should have one core and about 2GB of RAM
@@ -116,7 +116,6 @@ Tested on a Raspberry Pi Zero with a clean install of minimal Raspbian Stretch (
 ```
 * Build:
 ```     
-        $ cd triton
         $ mkdir build
         $ cd build
         $ cmake ..
