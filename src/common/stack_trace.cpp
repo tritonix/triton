@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2018, Triton Developers
+// Copyright (c) 2018, Triton Developers
 //
 // All rights reserved.
 //
