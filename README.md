@@ -65,12 +65,12 @@ invokes cmake commands as needed.
 #### On Linux and OS X
 
 * Install the dependencies
-* Build
-        cd triton
-        mkdir build
-        cd build
-        cmake ..
-        make
+* Build:
+        `$ cd triton `
+        `$ mkdir build `
+        `$ cd build `
+        `$ cmake .. `
+        `$ make `
 
     *Optional*: If your machine has several cores and enough memory, enable
     parallel build by running `make -j<number of threads>` instead of `make`. For
@@ -116,10 +116,11 @@ Tested on a Raspberry Pi Zero with a clean install of minimal Raspbian Stretch (
 ```
 * Build:
 ```     
-        mkdir build
-        cd build
-        cmake ..
-        make
+        $ cd triton
+        $ mkdir build
+        $ cd build
+        $ cmake ..
+        $ make
 ```
 * Wait 4-6 hours
 
