@@ -14,10 +14,11 @@ decentralizing hash power.
 will have a unique miner id which cannot be arbitrarily manipulated, and different difficulties that depend on their hash power.
 
 ## Build
-### Install dependencies.
+### Install dependencies
 
 Debian / Ubuntu one liner for all dependencies  
-`sudo apt update && sudo apt install build-essential cmake pkg-config libboost-all-dev libssl-dev libzmq3-dev libunbound-dev libsodium-dev libunwind8-dev liblzma-dev libreadline6-dev libldns-dev libexpat1-dev doxygen graphviz libpgm-dev`
+``` sudo apt update && sudo apt install build-essential cmake pkg-config libboost-all-dev libssl-dev libzmq3-dev libunbound-dev libsodium-dev libunwind8-dev liblzma-dev libreadline6-dev libldns-dev libexpat1-dev doxygen graphviz libpgm-dev
+```
 
 ### Cloning the repository
 Clone recursively to pull-in needed submodule(s):
@@ -61,6 +62,8 @@ Dependencies need to be built with -fPIC. Static libraries usually aren't, so yo
 * **Optional**: build documentation in `doc/html` (omit `HAVE_DOT=YES` if `graphviz` is not installed):
 
         HAVE_DOT=YES doxygen Doxyfile
+
+## Installing Triton from a package
 
 ## Running tritond
 
