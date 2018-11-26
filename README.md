@@ -4,6 +4,9 @@ Copyright (c) 2018 Triton Developers.
 Copyright (c) 2014-2018 The Monero Project.     
 Portions Copyright (c) 2012-2013 The Cryptonote developers.
 
+## Contact
+Mail : tritonix.project@gmail.com
+
 ## Introduction
  Triton is a Monero forked cryptocurrency that aims to be truly decentralized. It comes with all
 features Monero has in version 0.13.0. Privacy, ASIC resistance, bulletproof, which significantly
