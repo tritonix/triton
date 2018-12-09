@@ -167,6 +167,16 @@ namespace cryptonote {
     return tools::base58::encode_addr(address_prefix, t_serializable_object_to_blob(adr));
   }
   //-----------------------------------------------------------------------
+  std::string get_account_trustaddress_as_str(
+      network_type nettype
+    , account_public_address const & adr
+    )
+  {
+    uint64_t trustaddress_prefix = get_config(nettype).CRYPTONOTE_PUBLIC_TRUSTADDRESS_BASE58_PREFIX;
+
+    return tools::base58::encode_addr(trustaddress_prefix, t_serializable_object_to_blob(adr));
+  }
+  //-----------------------------------------------------------------------
   std::string get_account_integrated_address_as_str(
       network_type nettype
     , account_public_address const & adr
@@ -201,6 +211,7 @@ namespace cryptonote {
     uint64_t address_prefix = get_config(nettype).CRYPTONOTE_PUBLIC_ADDRESS_BASE58_PREFIX;
     uint64_t integrated_address_prefix = get_config(nettype).CRYPTONOTE_PUBLIC_INTEGRATED_ADDRESS_BASE58_PREFIX;
     uint64_t subaddress_prefix = get_config(nettype).CRYPTONOTE_PUBLIC_SUBADDRESS_BASE58_PREFIX;
+    uint64_t trustaddress_prefix = get_config(nettype).CRYPTONOTE_PUBLIC_TRUSTADDRESS_BASE58_PREFIX;
 
     if (2 * sizeof(public_address_outer_blob) != str.size())
     {
@@ -227,8 +238,13 @@ namespace cryptonote {
         info.is_subaddress = true;
         info.has_payment_id = false;
       }
+      else if (trustaddress_prefix == prefix)
+      {
+        info.is_subaddress = false;
+        info.has_payment_id = false;
+      }
       else {
-        LOG_PRINT_L1("Wrong address prefix: " << prefix << ", expected " << address_prefix 
+        LOG_PRINT_L1("Wrong address prefix: " << prefix << ", expected " << address_prefix
           << " or " << integrated_address_prefix
           << " or " << subaddress_prefix);
         return false;

@@ -1,21 +1,21 @@
 // Copyright (c) 2018, Triton Developers
-// 
+//
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -25,7 +25,7 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
+//
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
 #pragma once
@@ -460,13 +460,13 @@ namespace tools
         FIELD(cache_data)
       END_SERIALIZE()
     };
-    
+
     // GUI Address book
     struct address_book_row
     {
       cryptonote::account_public_address m_address;
       crypto::hash m_payment_id;
-      std::string m_description;   
+      std::string m_description;
       bool m_is_subaddress;
     };
 
@@ -693,12 +693,14 @@ namespace tools
     crypto::public_key get_subaddress_spend_public_key(const cryptonote::subaddress_index& index) const;
     std::vector<crypto::public_key> get_subaddress_spend_public_keys(uint32_t account, uint32_t begin, uint32_t end) const;
     std::string get_subaddress_as_str(const cryptonote::subaddress_index& index) const;
+    std::string get_trustaddress_as_str(const cryptonote::subaddress_index& index) const;
     std::string get_address_as_str() const { return get_subaddress_as_str({0, 0}); }
     std::string get_integrated_address_as_str(const crypto::hash8& payment_id) const;
     void add_subaddress_account(const std::string& label);
     size_t get_num_subaddress_accounts() const { return m_subaddress_labels.size(); }
     size_t get_num_subaddresses(uint32_t index_major) const { return index_major < m_subaddress_labels.size() ? m_subaddress_labels[index_major].size() : 0; }
     void add_subaddress(uint32_t index_major, const std::string& label); // throws when index is out of bound
+    void add_trustaddress(); 
     void expand_subaddresses(const cryptonote::subaddress_index& index);
     std::string get_subaddress_label(const cryptonote::subaddress_index& index) const;
     void set_subaddress_label(const cryptonote::subaddress_index &index, const std::string &label);
@@ -758,7 +760,7 @@ namespace tools
     bool sign_tx(unsigned_tx_set &exported_txs, const std::string &signed_filename, std::vector<wallet2::pending_tx> &ptx, bool export_raw = false);
     bool sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pending_tx> &ptx, signed_tx_set &signed_txs);
     std::string sign_tx_dump_to_str(unsigned_tx_set &exported_txs, std::vector<wallet2::pending_tx> &ptx, signed_tx_set &signed_txes);
-    // load unsigned_tx_set from file. 
+    // load unsigned_tx_set from file.
     bool load_unsigned_tx(const std::string &unsigned_filename, unsigned_tx_set &exported_txs) const;
     bool parse_unsigned_tx_from_str(const std::string &unsigned_tx_st, unsigned_tx_set &exported_txs) const;
     bool load_tx(const std::string &signed_filename, std::vector<tools::wallet2::pending_tx> &ptx, std::function<bool(const signed_tx_set&)> accept_func = NULL);
@@ -998,7 +1000,7 @@ namespace tools
     std::vector<address_book_row> get_address_book() const { return m_address_book; }
     bool add_address_book_row(const cryptonote::account_public_address &address, const crypto::hash &payment_id, const std::string &description, bool is_subaddress);
     bool delete_address_book_row(std::size_t row_id);
-        
+
     uint64_t get_num_rct_outputs();
     size_t get_num_transfer_details() const { return m_transfers.size(); }
     const transfer_details &get_transfer_details(size_t idx) const;
@@ -1036,7 +1038,7 @@ namespace tools
     std::string get_description() const;
 
     /*!
-     * \brief  Get the list of registered account tags. 
+     * \brief  Get the list of registered account tags.
      * \return first.Key=(tag's name), first.Value=(tag's label), second[i]=(i-th account's tag)
      */
     const std::pair<std::map<std::string, std::string>, std::vector<std::string>>& get_account_tags();

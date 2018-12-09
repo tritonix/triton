@@ -1129,6 +1129,12 @@ std::string wallet2::get_subaddress_as_str(const cryptonote::subaddress_index& i
   return cryptonote::get_account_address_as_str(m_nettype, !index.is_zero(), address);
 }
 //----------------------------------------------------------------------------------------------------
+std::string wallet2::get_trustaddress_as_str(const cryptonote::subaddress_index& index) const
+{
+  cryptonote::account_public_address address = get_subaddress(index);
+  return cryptonote::get_account_trustaddress_as_str(m_nettype, address);
+}
+//----------------------------------------------------------------------------------------------------
 std::string wallet2::get_integrated_address_as_str(const crypto::hash8& payment_id) const
 {
   return cryptonote::get_account_integrated_address_as_str(m_nettype, get_address(), payment_id);
@@ -1149,9 +1155,16 @@ void wallet2::add_subaddress(uint32_t index_major, const std::string& label)
   m_subaddress_labels[index_major][index_minor] = label;
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::add_trustaddress() {
+  std::string label = "(Trust address)";
+  uint32_t index_major = (uint32_t)get_num_subaddress_accounts();
+  add_subaddress(index_major - 1, label);
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::expand_subaddresses(const cryptonote::subaddress_index& index)
 {
   hw::device &hwdev = m_account.get_device();
+
   if (m_subaddress_labels.size() <= index.major)
   {
     // add new accounts
@@ -1177,7 +1190,9 @@ void wallet2::expand_subaddresses(const cryptonote::subaddress_index& index)
     const uint32_t end = get_subaddress_clamped_sum(index.minor, m_subaddress_lookahead_minor);
     const uint32_t begin = m_subaddress_labels[index.major].size();
     cryptonote::subaddress_index index2 = {index.major, begin};
+
     const std::vector<crypto::public_key> pkeys = hwdev.get_subaddress_spend_public_keys(m_account.get_keys(), index2.major, index2.minor, end);
+
     for (; index2.minor < end; ++index2.minor)
     {
        const crypto::public_key &D = pkeys[index2.minor - begin];
@@ -3693,7 +3708,6 @@ void wallet2::generate(const std::string& wallet_, const epee::wipeable_string& 
   }
 
   m_account.generate(rct::rct2sk(rct::zero()), true, false);
-
   THROW_WALLET_EXCEPTION_IF(multisig_data.size() < 32, error::invalid_multisig_seed);
   size_t offset = 0;
   uint32_t threshold = *(uint32_t*)(multisig_data.data() + offset);
@@ -3798,11 +3812,15 @@ crypto::secret_key wallet2::generate(const std::string& wallet_, const epee::wip
 
   setup_new_blockchain();
 
+  add_trustaddress();
+
   if (!wallet_.empty())
     store();
 
   return retval;
 }
+
+
 
  uint64_t wallet2::estimate_blockchain_height()
  {
@@ -3870,6 +3888,7 @@ void wallet2::generate(const std::string& wallet_, const epee::wipeable_string& 
 
   m_account.create_from_viewkey(account_public_address, viewkey);
   m_account_public_address = account_public_address;
+
   m_watch_only = true;
   m_multisig = false;
   m_multisig_threshold = 0;
