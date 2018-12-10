@@ -1126,6 +1126,10 @@ crypto::public_key wallet2::get_subaddress_spend_public_key(const cryptonote::su
 std::string wallet2::get_subaddress_as_str(const cryptonote::subaddress_index& index) const
 {
   cryptonote::account_public_address address = get_subaddress(index);
+
+  if (index.minor == 1)
+    return cryptonote::get_account_trustaddress_as_str(m_nettype, address);
+
   return cryptonote::get_account_address_as_str(m_nettype, !index.is_zero(), address);
 }
 //----------------------------------------------------------------------------------------------------
