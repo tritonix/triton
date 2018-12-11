@@ -126,7 +126,7 @@ static const struct {
   { 8, 1, 0, 1533211200 },
   { 9, 1, 0, 1533297600 },
 };
-static const uint64_t testnet_hard_fork_version_1_till = 624633;
+static const uint64_t testnet_hard_fork_version_1_till = 1;
 
 static const struct {
   uint8_t version;
