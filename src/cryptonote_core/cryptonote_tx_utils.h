@@ -76,14 +76,17 @@ namespace cryptonote
     uint64_t amount;                    //money
     account_public_address addr;        //destination address
     bool is_subaddress;
+    bool is_trustaddress;
 
-    tx_destination_entry() : amount(0), addr(AUTO_VAL_INIT(addr)), is_subaddress(false) { }
-    tx_destination_entry(uint64_t a, const account_public_address &ad, bool is_subaddress) : amount(a), addr(ad), is_subaddress(is_subaddress) { }
+    tx_destination_entry() : amount(0), addr(AUTO_VAL_INIT(addr)), is_subaddress(false), is_trustaddress(false) { }
+    tx_destination_entry(uint64_t a, const account_public_address &ad, bool is_subaddress) : amount(a), addr(ad), is_subaddress(is_subaddress), is_trustaddress(false) { }
+    tx_destination_entry(uint64_t a, const account_public_address &ad, bool is_subaddress, bool is_trustaddress) : amount(a), addr(ad), is_subaddress(is_subaddress), is_trustaddress(is_trustaddress) { }
 
     BEGIN_SERIALIZE_OBJECT()
       VARINT_FIELD(amount)
       FIELD(addr)
       FIELD(is_subaddress)
+      FIELD(is_trustaddress)
     END_SERIALIZE()
   };
 

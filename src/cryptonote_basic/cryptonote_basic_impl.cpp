@@ -227,21 +227,25 @@ namespace cryptonote {
       {
         info.is_subaddress = false;
         info.has_payment_id = true;
+        info.is_trustaddress = false;
       }
       else if (address_prefix == prefix)
       {
         info.is_subaddress = false;
         info.has_payment_id = false;
+        info.is_trustaddress = false;
       }
       else if (subaddress_prefix == prefix)
       {
         info.is_subaddress = true;
         info.has_payment_id = false;
+        info.is_trustaddress = false;
       }
       else if (trustaddress_prefix == prefix)
       {
         info.is_subaddress = false;
         info.has_payment_id = false;
+        info.is_trustaddress = true;
       }
       else {
         LOG_PRINT_L1("Wrong address prefix: " << prefix << ", expected " << address_prefix
