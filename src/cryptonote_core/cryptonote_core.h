@@ -119,6 +119,8 @@ namespace cryptonote
       *
       * @return true if the transaction was accepted, false otherwise
       */
+     bool handle_new_trust_tx(const blobdata& tx_blob, tx_verification_context& tvc);
+
      bool handle_incoming_tx(const blobdata& tx_blob, tx_verification_context& tvc, bool keeped_by_block, bool relayed, bool do_not_relay);
 
      /**

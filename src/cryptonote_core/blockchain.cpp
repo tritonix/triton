@@ -3683,6 +3683,10 @@ bool Blockchain::update_checkpoints(const std::string& file_path, bool check_dns
 
   return true;
 }
+void Blockchain::set_trust_tx(cryptonote::transaction& tx)
+{
+  trust_tx = tx;
+}
 //------------------------------------------------------------------
 void Blockchain::set_enforce_dns_checkpoints(bool enforce_checkpoints)
 {

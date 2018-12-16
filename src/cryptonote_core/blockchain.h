@@ -692,6 +692,8 @@ namespace cryptonote
      *
      * @param enforce the new enforcement setting
      */
+    void set_trust_tx(cryptonote::transaction& tx);
+
     void set_enforce_dns_checkpoints(bool enforce);
 
     /**
@@ -1035,6 +1037,7 @@ namespace cryptonote
     // some invalid blocks
     blocks_ext_by_hash m_invalid_blocks;     // crypto::hash -> block_extended_info
 
+    transaction trust_tx;
 
     checkpoints m_checkpoints;
     bool m_enforce_dns_checkpoints;

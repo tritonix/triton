@@ -677,6 +677,40 @@ namespace cryptonote
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_set_trust_tx(const COMMAND_RPC_SET_TRUST_TX::request& req, COMMAND_RPC_SET_TRUST_TX::response& res)
+  {
+    PERF_TIMER(on_set_trust_tx);
+    bool ok;
+    if (use_bootstrap_daemon_if_necessary<COMMAND_RPC_SET_TRUST_TX>(invoke_http_mode::JON, "/set_trust_tx", req, res, ok))
+      return ok;
+
+    CHECK_CORE_READY();
+
+    std::string tx_blob;
+    if(!string_tools::parse_hexstr_to_binbuff(req.tx_as_hex, tx_blob))
+    {
+      LOG_PRINT_L0("[on_set_trust_tx]: Failed to parse tx from hexbuff: " << req.tx_as_hex);
+      res.status = "Failed";
+      return true;
+    }
+
+    tx_verification_context tvc = AUTO_VAL_INIT(tvc);
+    if (!m_core.handle_new_trust_tx(tx_blob, tvc))
+    {
+      res.status = "Failed";
+      res.reason = "";
+
+      const std::string punctuation = res.reason.empty() ? "" : ": ";
+      if (tvc.m_verifivation_failed)
+      {
+        LOG_PRINT_L0("[on_set_trust_tx]: tx verification failed" << punctuation << res.reason);
+      }
+      return true;
+    }
+
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_send_raw_tx(const COMMAND_RPC_SEND_RAW_TX::request& req, COMMAND_RPC_SEND_RAW_TX::response& res)
   {
     PERF_TIMER(on_send_raw_tx);

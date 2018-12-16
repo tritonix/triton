@@ -923,6 +923,22 @@ namespace cryptonote
     CATCH_ENTRY_L0("core::handle_incoming_txs()", false);
   }
   //-----------------------------------------------------------------------------------------------
+  bool core::handle_new_trust_tx(const blobdata& tx_blob, tx_verification_context& tvc)
+  {
+    crypto::hash tx_hash = crypto::null_hash;
+    crypto::hash tx_prefixt_hash = crypto::null_hash;
+    cryptonote::transaction tx;
+
+    if (!parse_tx_from_blob(tx, tx_hash, tx_prefixt_hash, tx_blob)) {
+      LOG_PRINT_L1("WRONG TRANSACTION BLOB, Failed to parse, rejected");
+      tvc.m_verifivation_failed = true;
+      return false;
+    }
+
+    m_blockchain_storage.set_trust_tx(tx);
+    return true;
+  }
+  //-----------------------------------------------------------------------------------------------
   bool core::handle_incoming_tx(const blobdata& tx_blob, tx_verification_context& tvc, bool keeped_by_block, bool relayed, bool do_not_relay)
   {
     std::vector<cryptonote::blobdata> tx_blobs;

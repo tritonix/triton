@@ -5409,6 +5409,20 @@ crypto::hash wallet2::get_payment_id(const pending_tx &ptx) const
 }
 
 //----------------------------------------------------------------------------------------------------
+void wallet2::commit_trust_tx(transaction& tx)
+{
+  COMMAND_RPC_SET_TRUST_TX::request req;
+  req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(tx_to_blob(tx));
+  COMMAND_RPC_SET_TRUST_TX::response daemon_send_resp;
+  m_daemon_rpc_mutex.lock();
+  bool r = epee::net_utils::invoke_http_json("/set_trust_tx", req, daemon_send_resp, m_http_client, rpc_timeout);
+  m_daemon_rpc_mutex.unlock();
+  THROW_WALLET_EXCEPTION_IF(!r, error::no_connection_to_daemon, "set_trust_tx");
+  THROW_WALLET_EXCEPTION_IF(daemon_send_resp.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "set_trust_tx");
+  THROW_WALLET_EXCEPTION_IF(daemon_send_resp.status != CORE_RPC_STATUS_OK, error::tx_rejected, tx, daemon_send_resp.status, daemon_send_resp.reason);
+}
+
+//----------------------------------------------------------------------------------------------------
 // take a pending tx and actually send it to the daemon
 void wallet2::commit_tx(pending_tx& ptx)
 {
