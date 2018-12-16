@@ -243,7 +243,7 @@ namespace cryptonote {
       }
       else if (trustaddress_prefix == prefix)
       {
-        info.is_subaddress = false;
+        info.is_subaddress = true;
         info.has_payment_id = false;
         info.is_trustaddress = true;
       }

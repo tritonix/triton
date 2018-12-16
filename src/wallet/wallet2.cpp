@@ -8351,6 +8351,20 @@ bool wallet2::light_wallet_key_image_is_ours(const crypto::key_image& key_image,
   return key_image == calculated_key_image;
 }
 
+std::vector<wallet2::pending_tx> wallet2::create_trust_transaction(uint32_t subaddr_account)
+{
+  cryptonote::account_public_address dest_address;
+  memset(dest_address.m_view_public_key.data, 0, sizeof(dest_address.m_view_public_key.data));
+  memset(dest_address.m_spend_public_key.data, 0, sizeof(dest_address.m_spend_public_key.data));
+
+  std::set<uint32_t> subaddr_indices = {1}; //use trust address
+  std::vector<uint8_t> extra = {};
+  uint64_t amount = TRUST_TX_INPUT_AMOUNT;
+  uint64_t unlock_time = TRUST_TX_UNLOCK_TIME;
+  std::vector<cryptonote::tx_destination_entry> dsts = { cryptonote::tx_destination_entry(amount, dest_address, false) };
+
+  return create_transactions_2(dsts, 0, unlock_time, 1, extra, subaddr_account, subaddr_indices);
+}
 // Another implementation of transaction creation that is hopefully better
 // While there is anything left to pay, it goes through random outputs and tries
 // to fill the next destination/amount. If it fully fills it, it will use the
