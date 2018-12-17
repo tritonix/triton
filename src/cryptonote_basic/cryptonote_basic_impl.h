@@ -80,6 +80,7 @@ namespace cryptonote {
     account_public_address address;
     bool is_subaddress;
     bool has_payment_id;
+    bool is_trustaddress;
     crypto::hash8 payment_id;
   };
 

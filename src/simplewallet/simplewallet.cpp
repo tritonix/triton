@@ -4107,6 +4107,20 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args)
     return true;
   }
 
+  try {
+    m_wallet->prepare_for_mining(m_current_subaddress_account, m_wallet->is_trusted_daemon());
+  }
+  catch (std::exception &e)
+  {
+    handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+    fail_msg_writer() << tr("Mining has NOT been started");
+    return true;
+  }
+  catch (...) {
+    fail_msg_writer() << tr("Unknow error. Mining has NOT been started");
+    return true;
+  }
+
   COMMAND_RPC_START_MINING::response res;
   bool r = m_wallet->invoke_http_json("/start_mining", req, res);
   std::string err = interpret_rpc_response(r, res.status);
@@ -4281,6 +4295,11 @@ void simple_wallet::on_money_spent(uint64_t height, const crypto::hash &txid, co
 //----------------------------------------------------------------------------------------------------
 void simple_wallet::on_skip_transaction(uint64_t height, const crypto::hash &txid, const cryptonote::transaction& tx)
 {
+}
+//----------------------------------------------------------------------------------------------------
+void simple_wallet::on_trust_tx_exception(const std::exception &e)
+{
+  handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
 }
 //----------------------------------------------------------------------------------------------------
 boost::optional<epee::wipeable_string> simple_wallet::on_get_password(const char *reason)
@@ -4957,6 +4976,7 @@ bool simple_wallet::transfer_main(int transfer_type, const std::vector<std::stri
     }
     de.addr = info.address;
     de.is_subaddress = info.is_subaddress;
+    de.is_trustaddress = info.is_trustaddress;
     num_subaddresses += info.is_subaddress;
 
     if (info.has_payment_id || !payment_id_uri.empty())

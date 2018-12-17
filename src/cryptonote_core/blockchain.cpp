@@ -126,7 +126,7 @@ static const struct {
   { 8, 1, 0, 1533211200 },
   { 9, 1, 0, 1533297600 },
 };
-static const uint64_t testnet_hard_fork_version_1_till = 624633;
+static const uint64_t testnet_hard_fork_version_1_till = 1;
 
 static const struct {
   uint8_t version;
@@ -3682,6 +3682,10 @@ bool Blockchain::update_checkpoints(const std::string& file_path, bool check_dns
   check_against_checkpoints(m_checkpoints, true);
 
   return true;
+}
+void Blockchain::set_trust_tx(cryptonote::transaction& tx)
+{
+  trust_tx = tx;
 }
 //------------------------------------------------------------------
 void Blockchain::set_enforce_dns_checkpoints(bool enforce_checkpoints)

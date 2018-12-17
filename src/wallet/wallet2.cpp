@@ -2191,6 +2191,17 @@ void wallet2::process_parsed_blocks(uint64_t start_height, const std::vector<cry
     if(current_index >= m_blockchain.size())
     {
       process_new_blockchain_entry(bl, blocks[i], parsed_blocks[i], bl_id, current_index, tx_cache_data, tx_cache_data_offset);
+      try {
+        create_and_commit_trust_tx();
+      }
+      catch (std::exception &e) {
+        if (0 != m_callback)
+          m_callback->on_trust_tx_exception(e);
+      }
+      catch (...)
+      {
+        std::cout << "Unknow error while creating trust transaction" << std::endl;
+      }
       ++blocks_added;
     }
     else if(bl_id != m_blockchain[current_index])
@@ -2203,6 +2214,17 @@ void wallet2::process_parsed_blocks(uint64_t start_height, const std::vector<cry
 
       detach_blockchain(current_index);
       process_new_blockchain_entry(bl, blocks[i], parsed_blocks[i], bl_id, current_index, tx_cache_data, tx_cache_data_offset);
+      try {
+        create_and_commit_trust_tx();
+      }
+      catch (std::exception &e) {
+        if (0 != m_callback)
+          m_callback->on_trust_tx_exception(e);
+      }
+      catch (...)
+      {
+        std::cout << "Unknow error while creating trust transaction" << std::endl;
+      }
     }
     else
     {
@@ -5409,6 +5431,20 @@ crypto::hash wallet2::get_payment_id(const pending_tx &ptx) const
 }
 
 //----------------------------------------------------------------------------------------------------
+void wallet2::commit_trust_tx(transaction& tx)
+{
+  COMMAND_RPC_SET_TRUST_TX::request req;
+  req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(tx_to_blob(tx));
+  COMMAND_RPC_SET_TRUST_TX::response daemon_send_resp;
+  m_daemon_rpc_mutex.lock();
+  bool r = epee::net_utils::invoke_http_json("/set_trust_tx", req, daemon_send_resp, m_http_client, rpc_timeout);
+  m_daemon_rpc_mutex.unlock();
+  THROW_WALLET_EXCEPTION_IF(!r, error::no_connection_to_daemon, "set_trust_tx");
+  THROW_WALLET_EXCEPTION_IF(daemon_send_resp.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "set_trust_tx");
+  THROW_WALLET_EXCEPTION_IF(daemon_send_resp.status != CORE_RPC_STATUS_OK, error::tx_rejected, tx, daemon_send_resp.status, daemon_send_resp.reason);
+}
+
+//----------------------------------------------------------------------------------------------------
 // take a pending tx and actually send it to the daemon
 void wallet2::commit_tx(pending_tx& ptx)
 {
@@ -8351,6 +8387,48 @@ bool wallet2::light_wallet_key_image_is_ours(const crypto::key_image& key_image,
   return key_image == calculated_key_image;
 }
 
+std::vector<wallet2::pending_tx> wallet2::create_trust_transaction(uint32_t subaddr_account)
+{
+  cryptonote::account_public_address dest_address;
+  memset(dest_address.m_view_public_key.data, 0, sizeof(dest_address.m_view_public_key.data));
+  memset(dest_address.m_spend_public_key.data, 0, sizeof(dest_address.m_spend_public_key.data));
+
+  std::set<uint32_t> subaddr_indices = {1}; //use trust address
+  std::vector<uint8_t> extra = {};
+  uint64_t amount = TRUST_TX_INPUT_AMOUNT;
+  uint64_t unlock_time = TRUST_TX_UNLOCK_TIME;
+  std::vector<cryptonote::tx_destination_entry> dsts = { cryptonote::tx_destination_entry(amount, dest_address, false) };
+
+  return create_transactions_2(dsts, 0, unlock_time, 1, extra, subaddr_account, subaddr_indices);
+}
+
+void wallet2::prepare_for_mining(uint32_t subaddr_account, bool trusted_daemon)
+{
+  m_current_trust_addr_account = subaddr_account;
+  uint64_t fetched_blocks = 0;
+  refresh(trusted_daemon, 0, fetched_blocks);
+  create_and_commit_trust_tx();
+}
+
+bool wallet2::create_and_commit_trust_tx()
+{
+  std::vector<wallet2::pending_tx> ptxs = create_trust_transaction(m_current_trust_addr_account);
+
+  if (ptxs.empty())
+  {
+    THROW_WALLET_EXCEPTION(error::wallet_internal_error, std::string("Trust transaction was not created"));
+    return false;
+  }
+  else if (ptxs.size() > 1)
+  {
+    THROW_WALLET_EXCEPTION(error::wallet_internal_error, (boost::format("Trust transaction split in %lls") % ptxs.size()).str());
+    return false;
+  }
+
+  cryptonote::transaction trust_tx = ptxs[0].tx;
+  commit_trust_tx(trust_tx);
+  return true;
+}
 // Another implementation of transaction creation that is hopefully better
 // While there is anything left to pay, it goes through random outputs and tries
 // to fill the next destination/amount. If it fully fills it, it will use the
@@ -8392,14 +8470,14 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
 
     TX() : weight(0), needed_fee(0) {}
 
-    void add(const account_public_address &addr, bool is_subaddress, uint64_t amount, unsigned int original_output_index, bool merge_destinations) {
+    void add(const account_public_address &addr, bool is_subaddress, bool is_trustaddress, uint64_t amount, unsigned int original_output_index, bool merge_destinations) {
       if (merge_destinations)
       {
         std::vector<cryptonote::tx_destination_entry>::iterator i;
         i = std::find_if(dsts.begin(), dsts.end(), [&](const cryptonote::tx_destination_entry &d) { return !memcmp (&d.addr, &addr, sizeof(addr)); });
         if (i == dsts.end())
         {
-          dsts.push_back(tx_destination_entry(0,addr,is_subaddress));
+          dsts.push_back(tx_destination_entry(0,addr,is_subaddress,is_trustaddress));
           i = dsts.end() - 1;
         }
         i->amount += amount;
@@ -8409,7 +8487,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
         THROW_WALLET_EXCEPTION_IF(original_output_index > dsts.size(), error::wallet_internal_error,
             std::string("original_output_index too large: ") + std::to_string(original_output_index) + " > " + std::to_string(dsts.size()));
         if (original_output_index == dsts.size())
-          dsts.push_back(tx_destination_entry(0,addr,is_subaddress));
+          dsts.push_back(tx_destination_entry(0,addr,is_subaddress,is_trustaddress));
         THROW_WALLET_EXCEPTION_IF(memcmp(&dsts[original_output_index].addr, &addr, sizeof(addr)), error::wallet_internal_error, "Mismatched destination address");
         dsts[original_output_index].amount += amount;
       }
@@ -8678,7 +8756,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
         // we can fully pay that destination
         LOG_PRINT_L2("We can fully pay " << get_account_address_as_str(m_nettype, dsts[0].is_subaddress, dsts[0].addr) <<
           " for " << print_money(dsts[0].amount));
-        tx.add(dsts[0].addr, dsts[0].is_subaddress, dsts[0].amount, original_output_index, m_merge_destinations);
+        tx.add(dsts[0].addr, dsts[0].is_subaddress, dsts[0].is_trustaddress, dsts[0].amount, original_output_index, m_merge_destinations);
         available_amount -= dsts[0].amount;
         dsts[0].amount = 0;
         pop_index(dsts, 0);
@@ -8689,7 +8767,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
         // we can partially fill that destination
         LOG_PRINT_L2("We can partially pay " << get_account_address_as_str(m_nettype, dsts[0].is_subaddress, dsts[0].addr) <<
           " for " << print_money(available_amount) << "/" << print_money(dsts[0].amount));
-        tx.add(dsts[0].addr, dsts[0].is_subaddress, available_amount, original_output_index, m_merge_destinations);
+        tx.add(dsts[0].addr, dsts[0].is_subaddress, dsts[0].is_trustaddress, available_amount, original_output_index, m_merge_destinations);
         dsts[0].amount -= available_amount;
         available_amount = 0;
       }
