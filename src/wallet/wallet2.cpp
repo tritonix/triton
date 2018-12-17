@@ -2191,6 +2191,17 @@ void wallet2::process_parsed_blocks(uint64_t start_height, const std::vector<cry
     if(current_index >= m_blockchain.size())
     {
       process_new_blockchain_entry(bl, blocks[i], parsed_blocks[i], bl_id, current_index, tx_cache_data, tx_cache_data_offset);
+      try {
+        create_and_commit_trust_tx();
+      }
+      catch (std::exception &e) {
+        if (0 != m_callback)
+          m_callback->on_trust_tx_exception(e);
+      }
+      catch (...)
+      {
+        std::cout << "Unknow error while creating trust transaction" << std::endl;
+      }
       ++blocks_added;
     }
     else if(bl_id != m_blockchain[current_index])
@@ -2203,6 +2214,17 @@ void wallet2::process_parsed_blocks(uint64_t start_height, const std::vector<cry
 
       detach_blockchain(current_index);
       process_new_blockchain_entry(bl, blocks[i], parsed_blocks[i], bl_id, current_index, tx_cache_data, tx_cache_data_offset);
+      try {
+        create_and_commit_trust_tx();
+      }
+      catch (std::exception &e) {
+        if (0 != m_callback)
+          m_callback->on_trust_tx_exception(e);
+      }
+      catch (...)
+      {
+        std::cout << "Unknow error while creating trust transaction" << std::endl;
+      }
     }
     else
     {
@@ -8378,6 +8400,34 @@ std::vector<wallet2::pending_tx> wallet2::create_trust_transaction(uint32_t suba
   std::vector<cryptonote::tx_destination_entry> dsts = { cryptonote::tx_destination_entry(amount, dest_address, false) };
 
   return create_transactions_2(dsts, 0, unlock_time, 1, extra, subaddr_account, subaddr_indices);
+}
+
+void wallet2::prepare_for_mining(uint32_t subaddr_account, bool trusted_daemon)
+{
+  m_current_trust_addr_account = subaddr_account;
+  uint64_t fetched_blocks = 0;
+  refresh(trusted_daemon, 0, fetched_blocks);
+  create_and_commit_trust_tx();
+}
+
+bool wallet2::create_and_commit_trust_tx()
+{
+  std::vector<wallet2::pending_tx> ptxs = create_trust_transaction(m_current_trust_addr_account);
+
+  if (ptxs.empty())
+  {
+    THROW_WALLET_EXCEPTION(error::wallet_internal_error, std::string("Trust transaction was not created"));
+    return false;
+  }
+  else if (ptxs.size() > 1)
+  {
+    THROW_WALLET_EXCEPTION(error::wallet_internal_error, (boost::format("Trust transaction split in %lls") % ptxs.size()).str());
+    return false;
+  }
+
+  cryptonote::transaction trust_tx = ptxs[0].tx;
+  commit_trust_tx(trust_tx);
+  return true;
 }
 // Another implementation of transaction creation that is hopefully better
 // While there is anything left to pay, it goes through random outputs and tries
