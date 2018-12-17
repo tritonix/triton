@@ -8,13 +8,9 @@ Portions Copyright (c) 2012-2013 The Cryptonote developers.
 Mail : tritonix.project@gmail.com
 
 ## Introduction
- Triton is a Monero forked cryptocurrency that aims to be truly decentralized. It comes with all
-features Monero has in version 0.13.0. Privacy, ASIC resistance, bulletproof, which significantly
-reduces transaction fee. And to ensure the resistance to ASIC, Triton will follow Monero's mining algorithm updates.
- The purpose of Triton is to show how a digital currency can be truly decentralized. More specifically
-decentralizing hash power.
- To do this, Triton's new protocol will converge each miners hash rate to a valid point. Every miner
-will have a unique miner id which cannot be arbitrarily manipulated, and different difficulties that depend on their hash power.
+Triton is a Monero forked cryptocurrency which focuses on decentralization. It comes with all features Monero has, including Bulletproofs. To ensure the resistance to ASICs, Triton will follow Monero's mining algorithm updates which occurs every 6 months.
+The purpose of Triton's development is to show how a digital currency can be a peer to peer electronic cash for the whole world and at the same time, a decentralized system. More specifically,  mining hash power distribution, which will lead to decentralized block creation.
+In order to do this, we will make a few changes in the mining protocol. No details will be written here, but basically, this modified mining protocol will make it extremely difficult to collaborate with other miners to mine blocks, which we believe, will lead to a more secure network.
 
 ## Build
 ### Install dependencies
