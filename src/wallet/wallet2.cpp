@@ -2191,17 +2191,6 @@ void wallet2::process_parsed_blocks(uint64_t start_height, const std::vector<cry
     if(current_index >= m_blockchain.size())
     {
       process_new_blockchain_entry(bl, blocks[i], parsed_blocks[i], bl_id, current_index, tx_cache_data, tx_cache_data_offset);
-      try {
-        create_and_commit_trust_tx();
-      }
-      catch (std::exception &e) {
-        if (0 != m_callback)
-          m_callback->on_trust_tx_exception(e);
-      }
-      catch (...)
-      {
-        std::cout << "Unknow error while creating trust transaction" << std::endl;
-      }
       ++blocks_added;
     }
     else if(bl_id != m_blockchain[current_index])
@@ -2214,17 +2203,6 @@ void wallet2::process_parsed_blocks(uint64_t start_height, const std::vector<cry
 
       detach_blockchain(current_index);
       process_new_blockchain_entry(bl, blocks[i], parsed_blocks[i], bl_id, current_index, tx_cache_data, tx_cache_data_offset);
-      try {
-        create_and_commit_trust_tx();
-      }
-      catch (std::exception &e) {
-        if (0 != m_callback)
-          m_callback->on_trust_tx_exception(e);
-      }
-      catch (...)
-      {
-        std::cout << "Unknow error while creating trust transaction" << std::endl;
-      }
     }
     else
     {
@@ -8412,6 +8390,43 @@ void wallet2::prepare_for_mining(uint32_t subaddr_account, bool trusted_daemon)
 
 bool wallet2::create_and_commit_trust_tx()
 {
+  cryptonote::COMMAND_RPC_GET_TRANSACTION_POOL::request req;
+  cryptonote::COMMAND_RPC_GET_TRANSACTION_POOL::response res;
+  m_daemon_rpc_mutex.lock();
+  bool r = epee::net_utils::invoke_http_json("/get_transaction_pool", req, res, m_http_client, rpc_timeout);
+  m_daemon_rpc_mutex.unlock();
+  THROW_WALLET_EXCEPTION_IF(!r, error::no_connection_to_daemon, "get_transaction_pool");
+  THROW_WALLET_EXCEPTION_IF(res.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "get_transaction_pool.bin");
+  THROW_WALLET_EXCEPTION_IF(res.status != CORE_RPC_STATUS_OK, error::get_tx_pool_error);
+
+  cryptonote::transaction tx;
+  for (tx_info& txi : res.transactions)
+  {
+    blobdata tx_blob;
+    if (!epee::string_tools::parse_hexstr_to_binbuff(txi.tx_blob, tx_blob))
+    {
+      LOG_ERROR("Failed to parse from hexstr");
+      continue;
+    }
+
+    if (!parse_and_validate_tx_from_blob(tx_blob, tx))
+    {
+      LOG_ERROR("Failed to parse transaction from blob");
+      continue;
+    }
+
+    for (const cryptonote::txin_v& in : tx.vin)
+    {
+      if (in.type() != typeid(cryptonote::txin_to_key))
+        continue;
+      auto it = m_key_images.find(boost::get<cryptonote::txin_to_key>(in).k_image);
+      if (it != m_key_images.end())
+      {
+        //TODO Make a function that destinguishes a transaction and a trust transaction.
+        //Than dicide if make a new trust transaction or not.
+      }
+    }
+  }
   std::vector<wallet2::pending_tx> ptxs = create_trust_transaction(m_current_trust_addr_account);
 
   if (ptxs.empty())
