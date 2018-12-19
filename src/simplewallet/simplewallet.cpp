@@ -4107,6 +4107,7 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args)
     return true;
   }
 
+  SCOPED_WALLET_UNLOCK();
   try {
     m_wallet->prepare_for_mining(m_current_subaddress_account, m_wallet->is_trusted_daemon());
   }

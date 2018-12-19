@@ -925,6 +925,14 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   bool core::handle_new_trust_tx(const blobdata& tx_blob, tx_verification_context& tvc)
   {
+
+    if (!handle_incoming_tx(tx_blob, tvc, false, false, true))
+    {
+      std::cout << "Failed to handle as incoming transaction" << std::endl;
+      tvc.m_verifivation_failed = true;
+      return false;
+    }
+
     crypto::hash tx_hash = crypto::null_hash;
     crypto::hash tx_prefixt_hash = crypto::null_hash;
     cryptonote::transaction tx;
