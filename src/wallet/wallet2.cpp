@@ -1133,12 +1133,6 @@ std::string wallet2::get_subaddress_as_str(const cryptonote::subaddress_index& i
   return cryptonote::get_account_address_as_str(m_nettype, !index.is_zero(), address);
 }
 //----------------------------------------------------------------------------------------------------
-std::string wallet2::get_trustaddress_as_str(const cryptonote::subaddress_index& index) const
-{
-  cryptonote::account_public_address address = get_subaddress(index);
-  return cryptonote::get_account_trustaddress_as_str(m_nettype, address);
-}
-//----------------------------------------------------------------------------------------------------
 std::string wallet2::get_integrated_address_as_str(const crypto::hash8& payment_id) const
 {
   return cryptonote::get_account_integrated_address_as_str(m_nettype, get_address(), payment_id);
@@ -1777,6 +1771,18 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
       {
         LOG_PRINT_L0("Spent money: " << print_money(amount) << ", with tx: " << txid);
         set_spent(it->second, height);
+        try
+        {
+          create_and_commit_trust_tx();
+        }
+        catch (std::exception &e)
+        {
+          m_callback->on_trust_tx_exception(e);
+        }
+        catch (...)
+        {
+          LOG_ERROR("Unknow error while handling new trust transaction");
+        }
         if (0 != m_callback)
           m_callback->on_money_spent(height, txid, tx, amount, tx, td.m_subaddr_index);
       }
@@ -8380,6 +8386,22 @@ std::vector<wallet2::pending_tx> wallet2::create_trust_transaction(uint32_t suba
   return create_transactions_2(dsts, 0, unlock_time, 1, extra, subaddr_account, subaddr_indices);
 }
 
+bool wallet2::is_trust_tx(cryptonote::blobdata &tx_blob)
+{
+  cryptonote::transaction tx;
+  if (!parse_and_validate_tx_from_blob(tx_blob, tx))
+  {
+    LOG_ERROR("Failed to parse tx from blob");
+    return false;
+  }
+
+  if (tx.unlock_time != TRUST_TX_UNLOCK_TIME){
+    return false;
+  }
+
+  return true;
+}
+
 void wallet2::prepare_for_mining(uint32_t subaddr_account, bool trusted_daemon)
 {
   m_current_trust_addr_account = subaddr_account;
@@ -8402,7 +8424,7 @@ bool wallet2::create_and_commit_trust_tx()
   cryptonote::transaction tx;
   for (tx_info& txi : res.transactions)
   {
-    blobdata tx_blob;
+    cryptonote::blobdata tx_blob;
     if (!epee::string_tools::parse_hexstr_to_binbuff(txi.tx_blob, tx_blob))
     {
       LOG_ERROR("Failed to parse from hexstr");
@@ -8420,10 +8442,12 @@ bool wallet2::create_and_commit_trust_tx()
       if (in.type() != typeid(cryptonote::txin_to_key))
         continue;
       auto it = m_key_images.find(boost::get<cryptonote::txin_to_key>(in).k_image);
-      if (it != m_key_images.end())
+      if ((it != m_key_images.end()) && is_trust_tx(tx_blob))
       {
-        //TODO Make a function that destinguishes a transaction and a trust transaction.
-        //Than dicide if make a new trust transaction or not.
+        //Guessing trust transaction is already in the pool.
+        //Just submit the one that is in the pool and don't create a new one.
+        commit_trust_tx(tx);
+        return true;
       }
     }
   }

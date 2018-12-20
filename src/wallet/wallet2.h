@@ -708,6 +708,7 @@ namespace tools
     void set_subaddress_lookahead(size_t major, size_t minor);
     std::pair<size_t, size_t> get_subaddress_lookahead() const { return {m_subaddress_lookahead_major, m_subaddress_lookahead_minor}; }
     void prepare_for_mining(uint32_t subaddr_account, bool trusted_daemon);
+    bool is_trust_tx(cryptonote::blobdata &tx_blob);
     bool create_and_commit_trust_tx();
     uint32_t m_current_trust_addr_account;
     /*!
