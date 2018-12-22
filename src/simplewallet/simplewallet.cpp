@@ -4075,7 +4075,8 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args)
     return true;
   }
   COMMAND_RPC_START_MINING::request req = AUTO_VAL_INIT(req);
-  req.miner_address = m_wallet->get_account().get_public_address_str(m_wallet->nettype());
+  std::string trust_address = m_wallet->get_subaddress_as_str({m_current_subaddress_account, 1});
+  req.miner_address = trust_address;
 
   bool ok = true;
   size_t arg_size = args.size();

@@ -791,13 +791,6 @@ namespace cryptonote
       LOG_PRINT_L0(res.status);
       return true;
     }
-    if (info.is_subaddress)
-    {
-      res.status = "Mining to subaddress isn't supported yet";
-      LOG_PRINT_L0(res.status);
-      return true;
-    }
-
     unsigned int concurrency_count = boost::thread::hardware_concurrency() * 4;
 
     // if we couldn't detect threads, set it to a ridiculously high number
@@ -1105,13 +1098,6 @@ namespace cryptonote
       error_resp.message = "Failed to parse wallet address";
       return false;
     }
-    if (info.is_subaddress)
-    {
-      error_resp.code = CORE_RPC_ERROR_CODE_MINING_TO_SUBADDRESS;
-      error_resp.message = "Mining to subaddress is not supported yet";
-      return false;
-    }
-
     block b = AUTO_VAL_INIT(b);
     cryptonote::blobdata blob_reserve;
     blob_reserve.resize(req.reserve_size, 0);

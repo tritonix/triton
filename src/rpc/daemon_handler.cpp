@@ -358,14 +358,6 @@ namespace rpc
       res.status = Message::STATUS_FAILED;
       return;
     }
-    if (info.is_subaddress)
-    {
-      res.error_details = "Failed, mining to subaddress isn't supported yet";
-      LOG_PRINT_L0(res.error_details);
-      res.status = Message::STATUS_FAILED;
-      return;
-    }
-
     unsigned int concurrency_count = boost::thread::hardware_concurrency() * 4;
 
     // if we couldn't detect threads, set it to a ridiculously high number
