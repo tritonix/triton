@@ -80,8 +80,16 @@ namespace cryptonote
     tx.vout.clear();
     tx.extra.clear();
 
-    keypair txkey = keypair::generate(hw::get_device("default"));
-    add_tx_pub_key_to_extra(tx, txkey.pub);
+    hw::device &hwdev = hw::get_device("default");
+    crypto::secret_key tx_key;
+    hwdev.open_tx(tx_key);
+
+    crypto::public_key txkey_pub;
+    txkey_pub = rct::rct2pk(hwdev.scalarmultKey(rct::pk2rct(miner_address.m_spend_public_key), rct::sk2rct(tx_key)));
+
+    remove_field_from_tx_extra(tx.extra, typeid(tx_extra_pub_key));
+    add_tx_pub_key_to_extra(tx, txkey_pub);
+
     if(!extra_nonce.empty())
       if(!add_extra_nonce_to_tx_extra(tx.extra, extra_nonce))
         return false;
@@ -138,14 +146,19 @@ namespace cryptonote
       CHECK_AND_ASSERT_MES(max_outs >= out_amounts.size(), false, "max_out exceeded");
     }
 
+    std::vector<crypto::public_key> additional_tx_public_keys;
+    keypair additional_txkey;
     uint64_t summary_amounts = 0;
     for (size_t no = 0; no < out_amounts.size(); no++)
     {
-      crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);;
-      crypto::public_key out_eph_public_key = AUTO_VAL_INIT(out_eph_public_key);
-      bool r = crypto::generate_key_derivation(miner_address.m_view_public_key, txkey.sec, derivation);
-      CHECK_AND_ASSERT_MES(r, false, "while creating outs: failed to generate_key_derivation(" << miner_address.m_view_public_key << ", " << txkey.sec << ")");
+      additional_txkey.sec = keypair::generate(hwdev).sec;
+      additional_txkey.pub = rct::rct2pk(hwdev.scalarmultKey(rct::pk2rct(miner_address.m_spend_public_key), rct::sk2rct(additional_txkey.sec)));
+      additional_tx_public_keys.push_back(additional_txkey.pub);
 
+      crypto::key_derivation derivation = derivation;
+      crypto::public_key out_eph_public_key = out_eph_public_key;
+      bool r = crypto::generate_key_derivation(miner_address.m_view_public_key, additional_txkey.sec, derivation);
+      CHECK_AND_ASSERT_MES(r, false, "while creating outs: failed to generate_key_derivation(" << miner_address.m_view_public_key << ", " << additional_txkey.sec << ")");
       r = crypto::derive_public_key(derivation, no, miner_address.m_spend_public_key, out_eph_public_key);
       CHECK_AND_ASSERT_MES(r, false, "while creating outs: failed to derive_public_key(" << derivation << ", " << no << ", "<< miner_address.m_spend_public_key << ")");
 
@@ -160,6 +173,9 @@ namespace cryptonote
 
     CHECK_AND_ASSERT_MES(summary_amounts == block_reward, false, "Failed to construct miner tx, summary_amounts = " << summary_amounts << " not equal block_reward = " << block_reward);
 
+    remove_field_from_tx_extra(tx.extra, typeid(tx_extra_additional_pub_keys));
+    add_additional_tx_pub_keys_to_extra(tx.extra, additional_tx_public_keys);
+
     if (hard_fork_version >= 4)
       tx.version = 2;
     else
@@ -173,6 +189,7 @@ namespace cryptonote
 
     //LOG_PRINT("MINER_TX generated ok, block_reward=" << print_money(block_reward) << "("  << print_money(block_reward - fee) << "+" << print_money(fee)
     //  << "), current_block_size=" << current_block_size << ", already_generated_coins=" << already_generated_coins << ", tx_id=" << get_transaction_hash(tx), LOG_LEVEL_2);
+    hwdev.close_tx();
     return true;
   }
   //---------------------------------------------------------------
