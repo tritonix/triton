@@ -668,14 +668,13 @@ namespace cryptonote
   {
     //genesis block
     bl = boost::value_initialized<block>();
-
     /*
     //used to generate genesis transactions
     //mainnet
     {
       cryptonote::address_parse_info info;
       cryptonote::network_type nettype = cryptonote::MAINNET;
-      std::string address = "48UGG3sj6NbAmvSyZmgwAbSiqb7myd1N9eGTzhhjmCnwexRcTXdGpYK19Fx2Rj4H2PZ9d3HWbMUzqMgGDZ9TrvpU7DktXRW";
+      std::string address = "7HCmUET9YVeNs1TiAhYUBzDgzisBhg3kWCMFhGerB9PtFjRamCSrXYd3jjTCw9zGpwdtb7R8VanRzjotZJmLvHGHUZC2jYP";
 
       cryptonote::get_account_address_from_str(info, nettype, address);
 
@@ -688,7 +687,7 @@ namespace cryptonote
       cryptonote::transaction miner_tx;
       cryptonote::blobdata extra_nonce = "1";
       size_t max_outs = 1;
-      uint8_t hard_fork_version = 4;
+      uint8_t hard_fork_version = 1;
 
       cryptonote::construct_miner_tx(height, median_weight, already_generated_coins, current_block_weight, fee, public_address, miner_tx, extra_nonce, max_outs, hard_fork_version);
 
@@ -698,13 +697,12 @@ namespace cryptonote
 
       std::string genesis_tx = string_tools::buff_to_hex_nodelimer(ss.str());
     }
-
     //testnet
     {
       //construct miner transaction
       cryptonote::address_parse_info info;
       cryptonote::network_type nettype = cryptonote::TESTNET;
-      std::string address = "A1xZCFFhAF7cHPehztfrUT4Ec2Lj2hywiUknxn92K7j3UDS6fQZnzn4P8CiyS5ZwoLEg2uY7nKaYxT4te5s9EfR6GZEdJ67";
+      std::string address = "BjYB2n662ifDpDjGfWJ3V7UV1ULuqZ9XXPeiD6JktFiSespJuQ1GRF9Ro3pimG4ofk3XpUKZypXhKgtegFuN1CjhCPFng5T";
 
       cryptonote::get_account_address_from_str(info, nettype, address);
 
@@ -717,7 +715,7 @@ namespace cryptonote
       cryptonote::transaction miner_tx;
       cryptonote::blobdata extra_nonce = "1";
       size_t max_outs = 1;
-      uint8_t hard_fork_version = 4;
+      uint8_t hard_fork_version = 1;
 
       cryptonote::construct_miner_tx(height, median_weight, already_generated_coins, current_block_weight, fee, public_address, miner_tx, extra_nonce, max_outs, hard_fork_version);
 
@@ -727,13 +725,12 @@ namespace cryptonote
 
       std::string genesis_tx = string_tools::buff_to_hex_nodelimer(ss.str());
     }
-
     //stage net
     {
       //construct miner transaction
       cryptonote::address_parse_info info;
       cryptonote::network_type nettype = cryptonote::STAGENET;
-      std::string address = "53hVU2zZc3hbvkfhHw7QSo2gaBLazq5dhN7vN1NCYWevaePKM7t4azMbQQ7isdnfLViGM4Lvw8bq71gDazeecV125oRUuVy";
+      std::string address = "1cqGEYt72CoWbktQ4D16MC9gsnyvh5Yd7EzLvLUzRddfdu6YSHvcpsHCWa2KtnTqDpTQDMxFvpSs5VJA5e6QRDMGL3QJc3Q";
 
       cryptonote::get_account_address_from_str(info, nettype, address);
 
@@ -746,7 +743,7 @@ namespace cryptonote
       cryptonote::transaction miner_tx;
       cryptonote::blobdata extra_nonce = "1";
       size_t max_outs = 1;
-      uint8_t hard_fork_version = 4;
+      uint8_t hard_fork_version = 1;
 
       cryptonote::construct_miner_tx(height, median_weight, already_generated_coins, current_block_weight, fee, public_address, miner_tx, extra_nonce, max_outs, hard_fork_version);
 
@@ -757,7 +754,6 @@ namespace cryptonote
       std::string genesis_tx = string_tools::buff_to_hex_nodelimer(ss.str());
     }
     */
-
     blobdata tx_bl;
     bool r = string_tools::parse_hexstr_to_binbuff(genesis_tx, tx_bl);
     CHECK_AND_ASSERT_MES(r, false, "failed to parse coinbase tx from hard coded blob");
