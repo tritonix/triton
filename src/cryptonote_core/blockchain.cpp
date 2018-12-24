@@ -3405,7 +3405,7 @@ leave:
   }
 
   // check if trust transaction is in block
-  if (std::find(bl.tx_hashes.begin(), bl.tx_hashes.end(), bl.trust_tx.hash) == bl.tx_hashes.end())
+  if (m_db->height() != 0 && std::find(bl.tx_hashes.begin(), bl.tx_hashes.end(), bl.trust_tx.hash) == bl.tx_hashes.end())
   {
     MERROR_VER("Block with id: " << id << " Trust transaction not in block");
     bvc.m_verifivation_failed = true;
