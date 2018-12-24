@@ -159,7 +159,7 @@ namespace cryptonote
 
     if(!m_phandler->get_block_template(bl, m_mine_address, di, height, expected_reward, extra_nonce))
     {
-      LOG_ERROR("Failed to get_block_template(), stopping mining");
+      LOG_ERROR("Failed to get_block_template(), pausing mining");
       return false;
     }
     set_block_template(bl, di, height);

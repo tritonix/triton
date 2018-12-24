@@ -8445,8 +8445,7 @@ bool wallet2::create_and_commit_trust_tx()
       if ((it != m_key_images.end()) && is_trust_tx(tx_blob))
       {
         //Guessing trust transaction is already in the pool.
-        //Just submit the one that is in the pool and don't create a new one.
-        commit_trust_tx(tx);
+        //Do nothing.
         return true;
       }
     }
