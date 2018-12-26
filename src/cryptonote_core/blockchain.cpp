@@ -1300,7 +1300,7 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
   m_tx_pool.get_transaction_hashes(txhs);
   if (m_db->height() != 0 && std::find(txhs.begin(), txhs.end(), trust_tx.hash) == txhs.end())
   {
-    LOG_ERROR("Creating block template: error: Trust transaction not in block");
+    LOG_PRINT_L1("Creating block template: error: Trust transaction not in block");
     return false;
   }
   b.trust_tx = trust_tx;
@@ -1430,8 +1430,8 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
 #endif
     if (m_db->height() != 0 && std::find(b.tx_hashes.begin(), b.tx_hashes.end(), b.trust_tx.hash) == b.tx_hashes.end())
     {
-      LOG_ERROR("Creating block template: error: Couldn't find trust transaction in block");
-      break;
+      //LOG_ERROR("Creating block template: error: Couldn't find trust transaction in block");
+      continue;
     }
 
 #if defined(DEBUG_CREATE_BLOCK_TEMPLATE)

@@ -133,6 +133,10 @@ namespace cryptonote
     m_height = height;
     ++m_template_no;
     m_starter_nonce = crypto::rand<uint32_t>();
+    if (m_pausers_count)
+    {
+      resume();
+    }
     return true;
   }
   //-----------------------------------------------------------------------------------------------------
@@ -159,7 +163,8 @@ namespace cryptonote
 
     if(!m_phandler->get_block_template(bl, m_mine_address, di, height, expected_reward, extra_nonce))
     {
-      LOG_ERROR("Failed to get_block_template(), pausing mining");
+      LOG_PRINT_L1("Failed to get_block_template(), pausing mining");
+      pause();
       return false;
     }
     set_block_template(bl, di, height);
