@@ -2825,6 +2825,20 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
     LOG_PRINT_L1("Failed to check pending transactions");
   }
 
+  if(m_run.load(std::memory_order_relaxed))
+  {
+    if(get_blockchain_current_height() == 1 && !m_first_refresh_done)
+    {
+      cryptonote::block genesis_block;
+      generate_genesis(genesis_block);
+      const tx_cache_data cache = AUTO_VAL_INIT(cache);
+      std::vector<uint64_t> indices = {0};
+      //If you receive the output of this transaction,
+      //you received the first coins that were created in this blockchain.
+      process_new_transaction(get_transaction_hash(genesis_block.miner_tx), genesis_block.miner_tx,  indices, 0, genesis_block.timestamp, true, false, false, cache);
+    }
+  }
+
   m_first_refresh_done = true;
 
   LOG_PRINT_L1("Refresh done, blocks received: " << blocks_fetched << ", balance (all accounts): " << print_money(balance_all()) << ", unlocked: " << print_money(unlocked_balance_all()));

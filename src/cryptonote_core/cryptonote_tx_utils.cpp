@@ -674,7 +674,7 @@ namespace cryptonote
     {
       cryptonote::address_parse_info info;
       cryptonote::network_type nettype = cryptonote::MAINNET;
-      std::string address = "7HCmUET9YVeNs1TiAhYUBzDgzisBhg3kWCMFhGerB9PtFjRamCSrXYd3jjTCw9zGpwdtb7R8VanRzjotZJmLvHGHUZC2jYP";
+      std::string address = "7CaaFZgFV7Qax8BaoyAWmaW7mSsKwB2SdchwqL5qhGBr7nHGCTDMNCn1mLWPDmWQpoYUvs7G9F7CshkzQxGoE1ayPrBBs3g";
 
       cryptonote::get_account_address_from_str(info, nettype, address);
 
@@ -702,7 +702,7 @@ namespace cryptonote
       //construct miner transaction
       cryptonote::address_parse_info info;
       cryptonote::network_type nettype = cryptonote::TESTNET;
-      std::string address = "BjYB2n662ifDpDjGfWJ3V7UV1ULuqZ9XXPeiD6JktFiSespJuQ1GRF9Ro3pimG4ofk3XpUKZypXhKgtegFuN1CjhCPFng5T";
+      std::string address = "BmeFxT8vnwRP2zGaJxSABoDbkjxxh2gfrSd5Cd2JQWr4DuSVgAmX3byXf3YC8GdAUA1U8sKxyW6R17uHRircTQ5aS4hvRCi";
 
       cryptonote::get_account_address_from_str(info, nettype, address);
 
@@ -730,7 +730,7 @@ namespace cryptonote
       //construct miner transaction
       cryptonote::address_parse_info info;
       cryptonote::network_type nettype = cryptonote::STAGENET;
-      std::string address = "1cqGEYt72CoWbktQ4D16MC9gsnyvh5Yd7EzLvLUzRddfdu6YSHvcpsHCWa2KtnTqDpTQDMxFvpSs5VJA5e6QRDMGL3QJc3Q";
+      std::string address = "1ch1kyxcDGgdeDvmzmmxZJBfQCzwdjfvvAjiuk1zZeiEEe9Qr1SKd8cV2Du5xPzGYXMM2VUeV76eQaonLcbh4RNB4DmNSCn";
 
       cryptonote::get_account_address_from_str(info, nettype, address);
 

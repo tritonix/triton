@@ -1298,7 +1298,7 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
 
   std::vector<crypto::hash> txhs;
   m_tx_pool.get_transaction_hashes(txhs);
-  if (std::find(txhs.begin(), txhs.end(), trust_tx.hash) == txhs.end())
+  if (m_db->height() != 0 && std::find(txhs.begin(), txhs.end(), trust_tx.hash) == txhs.end())
   {
     LOG_ERROR("Creating block template: error: Trust transaction not in block");
     return false;
@@ -1428,7 +1428,7 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
     MDEBUG("Creating block template: miner tx weight " << coinbase_weight <<
         ", cumulative weight " << cumulative_weight << " is now good");
 #endif
-    if (std::find(b.tx_hashes.begin(), b.tx_hashes.end(), b.trust_tx.hash) == b.tx_hashes.end())
+    if (m_db->height() != 0 && std::find(b.tx_hashes.begin(), b.tx_hashes.end(), b.trust_tx.hash) == b.tx_hashes.end())
     {
       LOG_ERROR("Creating block template: error: Couldn't find trust transaction in block");
       break;
@@ -3541,7 +3541,7 @@ leave:
     goto leave;
   }
 
-  if (m_db->height() != 0)
+  if (m_db->height() != 0 && m_db->height() != 1)
   {
     if(!validate_trust_transaction(bl))
     {
