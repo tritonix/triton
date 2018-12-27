@@ -1771,17 +1771,20 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
       {
         LOG_PRINT_L0("Spent money: " << print_money(amount) << ", with tx: " << txid);
         set_spent(it->second, height);
-        try
+        if (tx.unlock_time == TRUST_TX_UNLOCK_TIME && amount >= TRUST_TX_INPUT_AMOUNT)
         {
-          create_and_commit_trust_tx();
-        }
-        catch (std::exception &e)
-        {
-          m_callback->on_trust_tx_exception(e);
-        }
-        catch (...)
-        {
-          LOG_ERROR("Unknow error while handling new trust transaction");
+          try
+          {
+            create_and_commit_trust_tx();
+          }
+          catch (std::exception &e)
+          {
+            m_callback->on_trust_tx_exception(e);
+          }
+          catch (...)
+          {
+            LOG_ERROR("Unknow error while handling new trust transaction");
+          }
         }
         if (0 != m_callback)
           m_callback->on_money_spent(height, txid, tx, amount, tx, td.m_subaddr_index);
