@@ -1722,6 +1722,12 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   bool core::check_block_rate()
   {
+    if (get_current_blockchain_height() <= 60)
+    {
+      MDEBUG("Not checking block rate, blockchain too young");
+      return true;
+    }
+
     if (m_offline || m_target_blockchain_height > get_current_blockchain_height())
     {
       MDEBUG("Not checking block rate, offline or syncing");
