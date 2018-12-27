@@ -1245,6 +1245,11 @@ namespace cryptonote
      *
      * @return false if something goes wrong with reverting (very bad), otherwise true
      */
+    bool validate_trust_transaction(const block& b);
+
+    /**
+
+    */
     bool rollback_blockchain_switching(std::list<block>& original_chain, uint64_t rollback_height);
 
     /**

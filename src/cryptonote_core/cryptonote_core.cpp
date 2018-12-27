@@ -1277,7 +1277,6 @@ namespace cryptonote
     }
     catch (const std::exception &e)
     {
-      m_miner.resume();
       return false;
     }
     prepare_handle_incoming_blocks(blocks);
@@ -1285,7 +1284,6 @@ namespace cryptonote
     cleanup_handle_incoming_blocks(true);
     //anyway - update miner template
     update_miner_block_template();
-    m_miner.resume();
 
 
     CHECK_AND_ASSERT_MES(!bvc.m_verifivation_failed, false, "mined block failed verification");
@@ -1489,8 +1487,7 @@ namespace cryptonote
   //-----------------------------------------------------------------------------------------------
   bool core::update_miner_block_template()
   {
-    m_miner.on_block_chain_update();
-    return true;
+    return m_miner.on_block_chain_update();
   }
   //-----------------------------------------------------------------------------------------------
   bool core::on_idle()

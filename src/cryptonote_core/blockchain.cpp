@@ -1174,6 +1174,38 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
   return true;
 }
 //------------------------------------------------------------------
+bool Blockchain::validate_trust_transaction(const block& b)
+{
+  transaction tx;
+  size_t tx_weight = 0;
+  uint64_t fee = 0;
+  bool relayed, do_not_relay, double_spend_seen;
+
+  txpool_tx_meta_t meta;
+  if (get_txpool_tx_meta(get_transaction_hash(b.trust_tx), meta))
+  {
+    MERROR("Failed to find tx in txpool");
+    return true;
+  }
+
+  uint64_t output_sum = 0;
+  for (auto& o: b.trust_tx.vout)
+    output_sum += o.amount;
+
+  if (fee > output_sum || output_sum - fee < TRUST_TX_INPUT_AMOUNT)
+  {
+    MERROR_VER("trust transaction doesn't have enough output " << print_money(output_sum));
+    return false;
+  }
+
+  if (typeid(b.trust_tx.unlock_time) != typeid(uint64_t) || b.trust_tx.unlock_time != TRUST_TX_UNLOCK_TIME)
+  {
+    MERROR_VER("trust transaction unlock time is not valid");
+    return false;
+  }
+  return true;
+}
+//------------------------------------------------------------------
 // get the block weights of the last <count> blocks, and return by reference <sz>.
 void Blockchain::get_last_n_blocks_weights(std::vector<size_t>& weights, size_t count) const
 {
@@ -1263,6 +1295,17 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
   already_generated_coins = m_db->get_block_already_generated_coins(height - 1);
 
   CRITICAL_REGION_END();
+
+  std::vector<crypto::hash> txhs;
+  m_tx_pool.get_transaction_hashes(txhs);
+  if (m_db->height() != 0 && std::find(txhs.begin(), txhs.end(), get_transaction_hash(trust_tx)) == txhs.end())
+  {
+    LOG_PRINT_L1("Creating block template: error: Trust transaction not in block");
+    return false;
+  }
+  b.trust_tx = trust_tx;
+  //Do not add the weight of the trust transaction which is in the block header.
+  //Just add the weight of the trust transaction which is in the transaction pool.
 
   size_t txs_weight;
   uint64_t fee;
@@ -1384,6 +1427,16 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
 #if defined(DEBUG_CREATE_BLOCK_TEMPLATE)
     MDEBUG("Creating block template: miner tx weight " << coinbase_weight <<
         ", cumulative weight " << cumulative_weight << " is now good");
+#endif
+    if (m_db->height() != 0 && std::find(b.tx_hashes.begin(), b.tx_hashes.end(), get_transaction_hash(b.trust_tx)) == b.tx_hashes.end())
+    {
+      //LOG_ERROR("Creating block template: error: Couldn't find trust transaction in block");
+      continue;
+    }
+
+#if defined(DEBUG_CREATE_BLOCK_TEMPLATE)
+    MDEBUG("Creating block template: trust tx weight " << trust_tx_weight <<
+        ", cumulative weight " << cumulative_weight);
 #endif
 
     cache_block_template(b, miner_address, ex_nonce, diffic, expected_reward, pool_cookie);
@@ -3351,6 +3404,14 @@ leave:
     goto leave;
   }
 
+  // check if trust transaction is in block
+  if (m_db->height() != 0 && std::find(bl.tx_hashes.begin(), bl.tx_hashes.end(), get_transaction_hash(bl.trust_tx)) == bl.tx_hashes.end())
+  {
+    MERROR_VER("Block with id: " << id << " Trust transaction not in block");
+    bvc.m_verifivation_failed = true;
+    goto leave;
+  }
+
   size_t coinbase_weight = get_transaction_weight(bl.miner_tx);
   size_t cumulative_block_weight = coinbase_weight;
 
@@ -3478,6 +3539,17 @@ leave:
     bvc.m_verifivation_failed = true;
     return_tx_to_pool(txs);
     goto leave;
+  }
+
+  if (m_db->height() != 0 && m_db->height() != 1)
+  {
+    if(!validate_trust_transaction(bl))
+    {
+      MERROR_VER("Block with id: " << id << " has incorrect trust transaction");
+      bvc.m_verifivation_failed = true;
+      return_tx_to_pool(txs);
+      goto leave;
+    }
   }
 
   TIME_MEASURE_FINISH(vmt);

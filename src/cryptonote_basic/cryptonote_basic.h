@@ -370,13 +370,14 @@ namespace cryptonote
 
   public:
     block(): block_header(), hash_valid(false) {}
-    block(const block &b): block_header(b), hash_valid(false), miner_tx(b.miner_tx), tx_hashes(b.tx_hashes) { if (b.is_hash_valid()) { hash = b.hash; set_hash_valid(true); } }
-    block &operator=(const block &b) { block_header::operator=(b); hash_valid = false; miner_tx = b.miner_tx; tx_hashes = b.tx_hashes; if (b.is_hash_valid()) { hash = b.hash; set_hash_valid(true); } return *this; }
+    block(const block &b): block_header(b), hash_valid(false), miner_tx(b.miner_tx), trust_tx(b.trust_tx), tx_hashes(b.tx_hashes) { if (b.is_hash_valid()) { hash = b.hash; set_hash_valid(true); } }
+    block &operator=(const block &b) { block_header::operator=(b); hash_valid = false; miner_tx = b.miner_tx; trust_tx = b.trust_tx; tx_hashes = b.tx_hashes; if (b.is_hash_valid()) { hash = b.hash; set_hash_valid(true); } return *this; }
     void invalidate_hashes() { set_hash_valid(false); }
     bool is_hash_valid() const { return hash_valid.load(std::memory_order_acquire); }
     void set_hash_valid(bool v) const { hash_valid.store(v,std::memory_order_release); }
 
     transaction miner_tx;
+    transaction trust_tx;
     std::vector<crypto::hash> tx_hashes;
 
     // hash cash
@@ -388,6 +389,7 @@ namespace cryptonote
 
       FIELDS(*static_cast<block_header *>(this))
       FIELD(miner_tx)
+      FIELD(trust_tx)
       FIELD(tx_hashes)
     END_SERIALIZE()
   };
