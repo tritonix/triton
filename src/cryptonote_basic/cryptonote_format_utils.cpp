@@ -1189,6 +1189,7 @@ namespace cryptonote
     CHECK_AND_ASSERT_MES(r, false, "Failed to parse block from blob");
     b.invalidate_hashes();
     b.miner_tx.invalidate_hashes();
+    b.trust_tx.invalidate_hashes();
     return true;
   }
   //---------------------------------------------------------------

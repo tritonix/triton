@@ -1182,7 +1182,7 @@ bool Blockchain::validate_trust_transaction(const block& b)
   bool relayed, do_not_relay, double_spend_seen;
 
   txpool_tx_meta_t meta;
-  if (get_txpool_tx_meta(b.trust_tx.hash, meta))
+  if (get_txpool_tx_meta(get_transaction_hash(b.trust_tx), meta))
   {
     MERROR("Failed to find tx in txpool");
     return true;
@@ -1298,7 +1298,7 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
 
   std::vector<crypto::hash> txhs;
   m_tx_pool.get_transaction_hashes(txhs);
-  if (m_db->height() != 0 && std::find(txhs.begin(), txhs.end(), trust_tx.hash) == txhs.end())
+  if (m_db->height() != 0 && std::find(txhs.begin(), txhs.end(), get_transaction_hash(trust_tx)) == txhs.end())
   {
     LOG_PRINT_L1("Creating block template: error: Trust transaction not in block");
     return false;
@@ -1428,7 +1428,7 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
     MDEBUG("Creating block template: miner tx weight " << coinbase_weight <<
         ", cumulative weight " << cumulative_weight << " is now good");
 #endif
-    if (m_db->height() != 0 && std::find(b.tx_hashes.begin(), b.tx_hashes.end(), b.trust_tx.hash) == b.tx_hashes.end())
+    if (m_db->height() != 0 && std::find(b.tx_hashes.begin(), b.tx_hashes.end(), get_transaction_hash(b.trust_tx)) == b.tx_hashes.end())
     {
       //LOG_ERROR("Creating block template: error: Couldn't find trust transaction in block");
       continue;
@@ -3405,7 +3405,7 @@ leave:
   }
 
   // check if trust transaction is in block
-  if (m_db->height() != 0 && std::find(bl.tx_hashes.begin(), bl.tx_hashes.end(), bl.trust_tx.hash) == bl.tx_hashes.end())
+  if (m_db->height() != 0 && std::find(bl.tx_hashes.begin(), bl.tx_hashes.end(), get_transaction_hash(bl.trust_tx)) == bl.tx_hashes.end())
   {
     MERROR_VER("Block with id: " << id << " Trust transaction not in block");
     bvc.m_verifivation_failed = true;
