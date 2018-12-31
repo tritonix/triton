@@ -101,7 +101,7 @@ using namespace cryptonote;
 #define SIGNED_TX_PREFIX "Triton signed tx set\004"
 #define MULTISIG_UNSIGNED_TX_PREFIX "Triton multisig unsigned tx set\001"
 
-#define RECENT_OUTPUT_RATIO (0.5) // 50% of outputs are from the recent zone
+#define RECENT_OUTPUT_RATIO (1.0) // 100% of outputs are from the recent zone
 #define RECENT_OUTPUT_DAYS (1.8) // last 1.8 day makes up the recent zone (taken from tritonlink.pdf, Miller et al)
 #define RECENT_OUTPUT_ZONE ((time_t)(RECENT_OUTPUT_DAYS * 86400))
 #define RECENT_OUTPUT_BLOCKS (RECENT_OUTPUT_DAYS * 720)
@@ -842,8 +842,8 @@ wallet2::wallet2(network_type nettype, uint64_t kdf_rounds, bool unattended):
   m_confirm_backlog_threshold(0),
   m_confirm_export_overwrite(true),
   m_auto_low_priority(true),
-  m_segregate_pre_fork_outputs(true),
-  m_key_reuse_mitigation2(true),
+  m_segregate_pre_fork_outputs(false),
+  m_key_reuse_mitigation2(false),
   m_segregation_height(0),
   m_ignore_fractional_outputs(true),
   m_is_initialized(false),
@@ -1731,6 +1731,7 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
   auto subaddr_account ([]()->boost::optional<uint32_t> {return boost::none;}());
   std::set<uint32_t> subaddr_indices;
   // check all outputs for spending (compare key images)
+  bool trust_tx_spent = false;
   for(auto& in: tx.vin)
   {
     if(in.type() != typeid(cryptonote::txin_to_key))
@@ -1768,22 +1769,27 @@ void wallet2::process_new_transaction(const crypto::hash &txid, const cryptonote
         set_spent(it->second, height);
         if (tx.unlock_time == TRUST_TX_UNLOCK_TIME && amount >= TRUST_TX_INPUT_AMOUNT)
         {
-          try
-          {
-            create_and_commit_trust_tx();
-          }
-          catch (std::exception &e)
-          {
-            m_callback->on_trust_tx_exception(e);
-          }
-          catch (...)
-          {
-            LOG_ERROR("Unknow error while handling new trust transaction");
-          }
+          trust_tx_spent = true;
         }
         if (0 != m_callback)
           m_callback->on_money_spent(height, txid, tx, amount, tx, td.m_subaddr_index);
       }
+    }
+  }
+
+  if (trust_tx_spent)
+  {
+    try
+    {
+      create_and_commit_trust_tx();
+    }
+    catch (std::exception &e)
+    {
+      m_callback->on_trust_tx_exception(e);
+    }
+    catch (...)
+    {
+      LOG_ERROR("Unknow error while handling new trust transaction");
     }
   }
 
@@ -3288,8 +3294,8 @@ bool wallet2::load_keys(const std::string& keys_file_name, const epee::wipeable_
     m_confirm_backlog_threshold = 0;
     m_confirm_export_overwrite = true;
     m_auto_low_priority = true;
-    m_segregate_pre_fork_outputs = true;
-    m_key_reuse_mitigation2 = true;
+    m_segregate_pre_fork_outputs = false;
+    m_key_reuse_mitigation2 = false;
     m_segregation_height = 0;
     m_ignore_fractional_outputs = true;
     m_subaddress_lookahead_major = SUBADDRESS_LOOKAHEAD_MAJOR;
@@ -6765,8 +6771,8 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
     uint64_t height;
     boost::optional<std::string> result = m_node_rpc_proxy.get_height(height);
     throw_on_rpc_response_error(result, "get_info");
-    bool is_shortly_after_segregation_fork = height >= segregation_fork_height && height < segregation_fork_height + SEGREGATION_FORK_VICINITY;
-    bool is_after_segregation_fork = height >= segregation_fork_height;
+    bool is_shortly_after_segregation_fork = false;
+    bool is_after_segregation_fork = true;
 
     // if we have at least one rct out, get the distribution, or fall back to the previous system
     uint64_t rct_start_height;
@@ -6809,50 +6815,6 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
       THROW_WALLET_EXCEPTION_IF(!r, error::no_connection_to_daemon, "transfer_selected");
       THROW_WALLET_EXCEPTION_IF(resp_t.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "get_output_histogram");
       THROW_WALLET_EXCEPTION_IF(resp_t.status != CORE_RPC_STATUS_OK, error::get_histogram_error, resp_t.status);
-    }
-
-    // if we want to segregate fake outs pre or post fork, get distribution
-    std::unordered_map<uint64_t, std::pair<uint64_t, uint64_t>> segregation_limit;
-    if (is_after_segregation_fork && (m_segregate_pre_fork_outputs || m_key_reuse_mitigation2))
-    {
-      cryptonote::COMMAND_RPC_GET_OUTPUT_DISTRIBUTION::request req_t = AUTO_VAL_INIT(req_t);
-      cryptonote::COMMAND_RPC_GET_OUTPUT_DISTRIBUTION::response resp_t = AUTO_VAL_INIT(resp_t);
-      for(size_t idx: selected_transfers)
-        req_t.amounts.push_back(m_transfers[idx].is_rct() ? 0 : m_transfers[idx].amount());
-      std::sort(req_t.amounts.begin(), req_t.amounts.end());
-      auto end = std::unique(req_t.amounts.begin(), req_t.amounts.end());
-      req_t.amounts.resize(std::distance(req_t.amounts.begin(), end));
-      req_t.from_height = std::max<uint64_t>(segregation_fork_height, RECENT_OUTPUT_BLOCKS) - RECENT_OUTPUT_BLOCKS;
-      req_t.cumulative = true;
-      req_t.binary = true;
-      m_daemon_rpc_mutex.lock();
-      bool r = net_utils::invoke_http_json_rpc("/json_rpc", "get_output_distribution", req_t, resp_t, m_http_client, rpc_timeout * 1000);
-      m_daemon_rpc_mutex.unlock();
-      THROW_WALLET_EXCEPTION_IF(!r, error::no_connection_to_daemon, "transfer_selected");
-      THROW_WALLET_EXCEPTION_IF(resp_t.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "get_output_distribution");
-      THROW_WALLET_EXCEPTION_IF(resp_t.status != CORE_RPC_STATUS_OK, error::get_output_distribution, resp_t.status);
-
-      // check we got all data
-      for(size_t idx: selected_transfers)
-      {
-        const uint64_t amount = m_transfers[idx].is_rct() ? 0 : m_transfers[idx].amount();
-        bool found = false;
-        for (const auto &d: resp_t.distributions)
-        {
-          if (d.amount == amount)
-          {
-            THROW_WALLET_EXCEPTION_IF(d.data.start_height > segregation_fork_height, error::get_output_distribution, "Distribution start_height too high");
-            THROW_WALLET_EXCEPTION_IF(segregation_fork_height - d.data.start_height >= d.data.distribution.size(), error::get_output_distribution, "Distribution size too small");
-            THROW_WALLET_EXCEPTION_IF(segregation_fork_height - RECENT_OUTPUT_BLOCKS - d.data.start_height >= d.data.distribution.size(), error::get_output_distribution, "Distribution size too small");
-            uint64_t till_fork = d.data.distribution[segregation_fork_height - d.data.start_height];
-            uint64_t recent = till_fork - d.data.distribution[segregation_fork_height - RECENT_OUTPUT_BLOCKS - d.data.start_height];
-            segregation_limit[amount] = std::make_pair(till_fork, recent);
-            found = true;
-            break;
-          }
-        }
-        THROW_WALLET_EXCEPTION_IF(!found, error::get_output_distribution, "Requested amount not found in response");
-      }
     }
 
     // we ask for more, to have spares if some outputs are still locked
@@ -6926,8 +6888,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
       const transfer_details &td = m_transfers[idx];
       const uint64_t amount = td.is_rct() ? 0 : td.amount();
       std::unordered_set<uint64_t> seen_indices;
-      // request more for rct in base recent (locked) coinbases are picked, since they're locked for longer
-      size_t requested_outputs_count = base_requested_outputs_count + (td.is_rct() ? CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW - CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE : 0);
+      size_t requested_outputs_count = base_requested_outputs_count + (td.is_rct() ? 10 : 0);//10 has no special meaning
       size_t start = req.outputs.size();
       bool use_histogram = amount != 0 || !has_rct_distribution;
 
@@ -6937,52 +6898,16 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
       float pre_fork_num_out_ratio = 0.0f;
       float post_fork_num_out_ratio = 0.0f;
 
-      if (is_after_segregation_fork && m_segregate_pre_fork_outputs && output_is_pre_fork)
+      for (const auto &he: resp_t.histogram)
       {
-        num_outs = segregation_limit[amount].first;
-        num_recent_outs = segregation_limit[amount].second;
-      }
-      else
-      {
-        // if there are just enough outputs to mix with, use all of them.
-        // Eventually this should become impossible.
-        for (const auto &he: resp_t.histogram)
+        if (he.amount == amount)
         {
-          if (he.amount == amount)
-          {
-            LOG_PRINT_L2("Found " << print_money(amount) << ": " << he.total_instances << " total, "
-                << he.unlocked_instances << " unlocked, " << he.recent_instances << " recent");
-            num_outs = he.unlocked_instances;
-            num_recent_outs = he.recent_instances;
-            break;
-          }
+          LOG_PRINT_L2("Found " << print_money(amount) << ": " << he.total_instances << " total, "
+              << he.unlocked_instances << " unlocked, " << he.recent_instances << " recent");
+          num_outs = he.unlocked_instances;
+          num_recent_outs = he.recent_instances;
+          break;
         }
-        if (is_after_segregation_fork && m_key_reuse_mitigation2)
-        {
-          if (output_is_pre_fork)
-          {
-            if (is_shortly_after_segregation_fork)
-            {
-              pre_fork_num_out_ratio = 33.4/100.0f * (1.0f - RECENT_OUTPUT_RATIO);
-            }
-            else
-            {
-              pre_fork_num_out_ratio = 33.4/100.0f * (1.0f - RECENT_OUTPUT_RATIO);
-              post_fork_num_out_ratio = 33.4/100.0f * (1.0f - RECENT_OUTPUT_RATIO);
-            }
-          }
-          else
-          {
-            if (is_shortly_after_segregation_fork)
-            {
-            }
-            else
-            {
-              post_fork_num_out_ratio = 67.8/100.0f * (1.0f - RECENT_OUTPUT_RATIO);
-            }
-          }
-        }
-        num_post_fork_outs = num_outs - segregation_limit[amount].first;
       }
 
       if (use_histogram)
@@ -7003,8 +6928,8 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
       }
 
       // how many fake outs to draw on a pre-fork distribution
-      size_t pre_fork_outputs_count = requested_outputs_count * pre_fork_num_out_ratio;
-      size_t post_fork_outputs_count = requested_outputs_count * post_fork_num_out_ratio;
+      size_t pre_fork_outputs_count = 0;
+      size_t post_fork_outputs_count = 0;
       // how many fake outs to draw otherwise
       size_t normal_output_count = requested_outputs_count - pre_fork_outputs_count - post_fork_outputs_count;
 
@@ -7067,6 +6992,14 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
 
       if (num_outs <= requested_outputs_count && !existing_ring_found)
       {
+        if (num_found == 0)
+        {
+          num_found = 1;
+          seen_indices.emplace(td.m_global_output_index);
+          req.outputs.push_back({amount, td.m_global_output_index});
+          LOG_PRINT_L1("Selecting real output: " << td.m_global_output_index << " for " << print_money(amount));
+        }
+
         for (uint64_t i = 0; i < num_outs; i++)
           req.outputs.push_back({amount, i});
         // duplicate to make up shortfall: this will be caught after the RPC call,
@@ -7115,55 +7048,8 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
           const char *type = "";
           if (amount == 0 && has_rct_distribution)
           {
-            // gamma distribution
-            if (num_found -1 < recent_outputs_count + pre_fork_outputs_count)
-            {
-              do i = pick_gamma(); while (i >= segregation_limit[amount].first);
-              type = "pre-fork gamma";
-            }
-            else if (num_found -1 < recent_outputs_count + pre_fork_outputs_count + post_fork_outputs_count)
-            {
-              do i = pick_gamma(); while (i < segregation_limit[amount].first || i >= num_outs);
-              type = "post-fork gamma";
-            }
-            else
-            {
-              do i = pick_gamma(); while (i >= num_outs);
-              type = "gamma";
-            }
-          }
-          else if (num_found - 1 < recent_outputs_count) // -1 to account for the real one we seeded with
-          {
-            // triangular distribution over [a,b) with a=0, mode c=b=up_index_limit
-            uint64_t r = crypto::rand<uint64_t>() % ((uint64_t)1 << 53);
-            double frac = std::sqrt((double)r / ((uint64_t)1 << 53));
-            i = (uint64_t)(frac*num_recent_outs) + num_outs - num_recent_outs;
-            // just in case rounding up to 1 occurs after calc
-            if (i == num_outs)
-              --i;
-            type = "recent";
-          }
-          else if (num_found -1 < recent_outputs_count + pre_fork_outputs_count)
-          {
-            // triangular distribution over [a,b) with a=0, mode c=b=up_index_limit
-            uint64_t r = crypto::rand<uint64_t>() % ((uint64_t)1 << 53);
-            double frac = std::sqrt((double)r / ((uint64_t)1 << 53));
-            i = (uint64_t)(frac*segregation_limit[amount].first);
-            // just in case rounding up to 1 occurs after calc
-            if (i == num_outs)
-              --i;
-            type = " pre-fork";
-          }
-          else if (num_found -1 < recent_outputs_count + pre_fork_outputs_count + post_fork_outputs_count)
-          {
-            // triangular distribution over [a,b) with a=0, mode c=b=up_index_limit
-            uint64_t r = crypto::rand<uint64_t>() % ((uint64_t)1 << 53);
-            double frac = std::sqrt((double)r / ((uint64_t)1 << 53));
-            i = (uint64_t)(frac*num_post_fork_outs) + segregation_limit[amount].first;
-            // just in case rounding up to 1 occurs after calc
-            if (i == num_post_fork_outs+segregation_limit[amount].first)
-              --i;
-            type = "post-fork";
+            do i = pick_gamma(); while (i >= num_outs);
+            type = "gamma";
           }
           else
           {
@@ -7237,7 +7123,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
     for(size_t idx: selected_transfers)
     {
       const transfer_details &td = m_transfers[idx];
-      size_t requested_outputs_count = base_requested_outputs_count + (td.is_rct() ? CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW - CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE : 0);
+      size_t requested_outputs_count = base_requested_outputs_count + (td.is_rct() ? 10 : 0);//10 has no special meaning
       outs.push_back(std::vector<get_outs_entry>());
       outs.back().reserve(fake_outputs_count + 1);
       const rct::key mask = td.is_rct() ? rct::commit(td.amount(), td.m_mask) : rct::zeroCommit(td.amount());
@@ -7245,9 +7131,7 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
       uint64_t num_outs = 0;
       const uint64_t amount = td.is_rct() ? 0 : td.amount();
       const bool output_is_pre_fork = td.m_block_height < segregation_fork_height;
-      if (is_after_segregation_fork && m_segregate_pre_fork_outputs && output_is_pre_fork)
-        num_outs = segregation_limit[amount].first;
-      else for (const auto &he: resp_t.histogram)
+      for (const auto &he: resp_t.histogram)
       {
         if (he.amount == amount)
         {
@@ -8531,9 +8415,9 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
   uint64_t needed_fee, available_for_fee = 0;
   uint64_t upper_transaction_weight_limit = get_upper_transaction_weight_limit();
   const bool use_per_byte_fee = true;
-  const bool use_rct = true;
-  const bool bulletproof = true;
-  const rct::RangeProofType range_proof_type = rct::RangeProofPaddedBulletproof;
+  const bool use_rct = fake_outs_count > 0;
+  const bool bulletproof = use_rct;
+  const rct::RangeProofType range_proof_type = bulletproof ? rct::RangeProofPaddedBulletproof : rct::RangeProofBorromean;
 
   const uint64_t base_fee  = get_base_fee();
   const uint64_t fee_multiplier = get_fee_multiplier(priority, get_fee_algorithm());
@@ -8603,7 +8487,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
       MDEBUG("Ignoring output " << i << " of amount " << print_money(td.amount()) << " which is below threshold " << print_money(fractional_threshold));
       continue;
     }
-    if (!td.m_spent && !td.m_key_image_partial && (use_rct ? true : !td.is_rct()) && is_transfer_unlocked(td) && td.m_subaddr_index.major == subaddr_account && subaddr_indices.count(td.m_subaddr_index.minor) == 1)
+    if (!td.m_spent && !td.m_key_image_partial && is_transfer_unlocked(td) && td.m_subaddr_index.major == subaddr_account && subaddr_indices.count(td.m_subaddr_index.minor) == 1)
     {
       const uint32_t index_minor = td.m_subaddr_index.minor;
       auto find_predicate = [&index_minor](const std::pair<uint32_t, std::vector<size_t>>& x) { return x.first == index_minor; };

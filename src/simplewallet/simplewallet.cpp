@@ -4110,7 +4110,10 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args)
 
   SCOPED_WALLET_UNLOCK();
   try {
-    m_wallet->prepare_for_mining(m_current_subaddress_account, m_wallet->is_trusted_daemon());
+    if (m_wallet->get_blockchain_current_height() >= TRUST_TX_ACTIVATE_HEIGHT)
+    {
+      m_wallet->prepare_for_mining(m_current_subaddress_account, m_wallet->is_trusted_daemon());
+    }
   }
   catch (std::exception &e)
   {
