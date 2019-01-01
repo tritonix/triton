@@ -8289,6 +8289,90 @@ void wallet2::prepare_for_mining(uint32_t subaddr_account, bool trusted_daemon)
   create_and_commit_trust_tx();
 }
 
+bool wallet2::stop_mining()
+{
+  cryptonote::COMMAND_RPC_GET_TRANSACTION_POOL::request req = AUTO_VAL_INIT(req);
+  cryptonote::COMMAND_RPC_GET_TRANSACTION_POOL::response res = AUTO_VAL_INIT(res);
+  m_daemon_rpc_mutex.lock();
+  bool r = epee::net_utils::invoke_http_json("/get_transaction_pool", req, res, m_http_client, rpc_timeout);
+  m_daemon_rpc_mutex.unlock();
+  THROW_WALLET_EXCEPTION_IF(!r, error::no_connection_to_daemon, "get_transaction_pool");
+  THROW_WALLET_EXCEPTION_IF(res.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "get_transaction_pool.bin");
+  THROW_WALLET_EXCEPTION_IF(res.status != CORE_RPC_STATUS_OK, error::get_tx_pool_error);
+
+  std::vector<cryptonote::transaction> trust_txs;
+  cryptonote::transaction tx;
+  bool is_ours;
+  for (tx_info& txi : res.transactions)
+  {
+    cryptonote::blobdata tx_blob;
+    if (!epee::string_tools::parse_hexstr_to_binbuff(txi.tx_blob, tx_blob))
+    {
+      LOG_ERROR("Failed to parse from hexstr");
+      continue;
+    }
+
+    if (!parse_and_validate_tx_from_blob(tx_blob, tx))
+    {
+      LOG_ERROR("Failed to parse transaction from blob");
+      continue;
+    }
+
+    is_ours = false;
+    for (const cryptonote::txin_v& in : tx.vin)
+    {
+      if (in.type() != typeid(cryptonote::txin_to_key))
+        continue;
+      auto it = m_key_images.find(boost::get<cryptonote::txin_to_key>(in).k_image);
+      if ((it != m_key_images.end()) && is_trust_tx(tx_blob))
+      {
+        is_ours = true;
+      }
+    }
+
+    if (is_ours)
+    {
+      trust_txs.push_back(tx);
+    }
+  }
+
+  if (!flush_txs(trust_txs))
+  {
+    std::cout << "failed to flush transaction" << std::endl;
+    return false;
+  }
+
+  return true;
+}
+
+bool wallet2::flush_txs(std::vector<cryptonote::transaction> &txs)
+{
+  cryptonote::COMMAND_RPC_FLUSH_TRANSACTION_POOL::request req = AUTO_VAL_INIT(req);;
+  cryptonote::COMMAND_RPC_FLUSH_TRANSACTION_POOL::response res = AUTO_VAL_INIT(res);;
+
+  std::vector<std::string> txids;
+  crypto::hash tx_hash;
+  for (cryptonote::transaction &tx : txs)
+  {
+    if (!get_transaction_hash(tx, tx_hash))
+    {
+      return false;
+    }
+    std::string buffer(tx_hash.data);
+    txids.push_back(string_tools::buff_to_hex_nodelimer(buffer));
+  }
+
+  req.txids = txids;
+
+  m_daemon_rpc_mutex.lock();
+  bool r = epee::net_utils::invoke_http_json_rpc("/json_rpc", "flush_txpool", req, res, m_http_client, rpc_timeout);
+  m_daemon_rpc_mutex.unlock();
+  THROW_WALLET_EXCEPTION_IF(!r, error::no_connection_to_daemon, "flush_txpool");
+  THROW_WALLET_EXCEPTION_IF(res.status == CORE_RPC_STATUS_BUSY, error::daemon_busy, "flush_txpool");
+  THROW_WALLET_EXCEPTION_IF(res.status != CORE_RPC_STATUS_OK, error::wallet_internal_error, "flush_txpool");
+  return true;
+}
+
 bool wallet2::create_and_commit_trust_tx()
 {
   cryptonote::COMMAND_RPC_GET_TRANSACTION_POOL::request req;

@@ -4147,6 +4147,21 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
     return true;
   }
 
+  try
+  {
+    m_wallet->stop_mining();
+  }
+  catch (const std::exception& e)
+  {
+    LOG_PRINT_L1("Trust transaction was not removed from the transaction pool, but this should not be a problem");
+    handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+  }
+  catch (...)
+  {
+    LOG_ERROR("Unknown error");
+    fail_msg_writer() << tr("unknown error");
+  }
+
   COMMAND_RPC_STOP_MINING::request req;
   COMMAND_RPC_STOP_MINING::response res;
   bool r = m_wallet->invoke_http_json("/stop_mining", req, res);
