@@ -6992,14 +6992,6 @@ void wallet2::get_outs(std::vector<std::vector<tools::wallet2::get_outs_entry>> 
 
       if (num_outs <= requested_outputs_count && !existing_ring_found)
       {
-        if (num_found == 0)
-        {
-          num_found = 1;
-          seen_indices.emplace(td.m_global_output_index);
-          req.outputs.push_back({amount, td.m_global_output_index});
-          LOG_PRINT_L1("Selecting real output: " << td.m_global_output_index << " for " << print_money(amount));
-        }
-
         for (uint64_t i = 0; i < num_outs; i++)
           req.outputs.push_back({amount, i});
         // duplicate to make up shortfall: this will be caught after the RPC call,
@@ -8530,7 +8522,10 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
   if (subaddr_indices.empty()) // "index=<N1>[,<N2>,...]" wasn't specified -> use all the indices with non-zero unlocked balance
   {
     for (const auto& i : balance_per_subaddr)
-      subaddr_indices.insert(i.first);
+      if (i.first != 1)//Do not spend from Trust address if it's not specified.
+      {
+        subaddr_indices.insert(i.first);
+      }
   }
 
   // early out if we know we can't make it anyway
@@ -8544,6 +8539,20 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(std::vector<cryp
     balance_subtotal += balance_per_subaddr[index_minor];
     unlocked_balance_subtotal += unlocked_balance_per_subaddr[index_minor];
   }
+
+  if (subaddr_indices.empty() && unlocked_balance_per_subaddr.at(1) > 0)
+  {
+    std::cout << "Unlocked balance only found in Trust address."
+    << "Spending from Trust address will significantly increase the transaction fee."
+    << "If you are sure you want to spent from this address, please specify index=1" << std::endl;
+  }
+  else if (needed_money + min_fee > unlocked_balance_subtotal && unlocked_balance_per_subaddr.at(1) > needed_money + min_fee)
+  {
+    std::cout << "Unlocked balance found in Trust address."
+    << "Spending from Trust address will significantly increase the transaction fee."
+    << "If you want to spned from this address, please specify index=1." << std::endl;
+  }
+
   THROW_WALLET_EXCEPTION_IF(needed_money + min_fee > balance_subtotal, error::not_enough_money,
     balance_subtotal, needed_money, 0);
   // first check overall balance is enough, then unlocked one, so we throw distinct exceptions
