@@ -87,23 +87,7 @@ static const struct {
   uint8_t threshold;
   time_t time;
 } mainnet_hard_forks[] = {
-  { 1, 1, 0, 1341378000 },
-
-  { 2, 1, 0, 1442763710 },
-
-  { 3, 1, 0, 1458558528 },
-
-  { 4, 1, 0, 1483574400 },
-
-  { 5, 1, 0, 1489520158 },
-
-  { 6, 1, 0, 1503046577 },
-
-  { 7, 1, 0, 1521303150 },
-
-  { 8, 1, 0, 1535889547 },
-
-  { 9, 1, 0, 1535889548 },
+  { 1, 1, 0, 1545986361 },
 };
 static const uint64_t mainnet_hard_fork_version_1_till = 1;
 
@@ -113,18 +97,7 @@ static const struct {
   uint8_t threshold;
   time_t time;
 } testnet_hard_forks[] = {
-  { 1, 1, 0, 1341378000 },
-
-  { 2, 1, 0, 1445355000 },
-
-  { 3, 1, 0, 1472415034 },
-  { 4, 1, 0, 1472415035 },
-  { 5, 1, 0, 1472415036 + 86400*180 },
-
-  { 6, 1, 0, 1501709789 },
-  { 7, 1, 0, 1512211236 },
-  { 8, 1, 0, 1533211200 },
-  { 9, 1, 0, 1533297600 },
+  { 1, 1, 0, 1545986361 },
 };
 static const uint64_t testnet_hard_fork_version_1_till = 1;
 
@@ -134,16 +107,7 @@ static const struct {
   uint8_t threshold;
   time_t time;
 } stagenet_hard_forks[] = {
-  { 1, 1, 0, 1341378000 },
-
-  { 2, 1, 0, 1521000000 },
-  { 3, 1, 0, 1521120000 },
-  { 4, 1, 0, 1521240000 },
-  { 5, 1, 0, 1521360000 },
-  { 6, 1, 0, 1521480000 },
-  { 7, 1, 0, 1521600000 },
-  { 8, 1, 0, 1537821770 },
-  { 9, 1, 0, 1537821771 },
+  { 1, 1, 0, 1545986361 },
 };
 
 //------------------------------------------------------------------
@@ -215,7 +179,7 @@ bool Blockchain::scan_outputkeys_for_indexes(size_t tx_version, const txin_to_ke
   {
     try
     {
-      m_db->get_output_key(tx_in_to_key.amount, absolute_offsets, outputs, true);
+      m_db->get_output_key(0, absolute_offsets, outputs, true); //Always search for amount 0. Because non rct outputs are not allowed.
       if (absolute_offsets.size() != outputs.size())
       {
         MERROR_VER("Output does not exist! amount = " << tx_in_to_key.amount);
@@ -241,7 +205,7 @@ bool Blockchain::scan_outputkeys_for_indexes(size_t tx_version, const txin_to_ke
         add_offsets.push_back(absolute_offsets[i]);
       try
       {
-        m_db->get_output_key(tx_in_to_key.amount, add_offsets, add_outputs, true);
+        m_db->get_output_key(0, add_offsets, add_outputs, true); //Always search for amount 0. Because non rct outputs are not allowed.
         if (add_offsets.size() != add_outputs.size())
         {
           MERROR_VER("Output does not exist! amount = " << tx_in_to_key.amount);
@@ -269,7 +233,7 @@ bool Blockchain::scan_outputkeys_for_indexes(size_t tx_version, const txin_to_ke
         if (count < outputs.size())
           output_index = outputs.at(count);
         else
-          output_index = m_db->get_output_key(tx_in_to_key.amount, i);
+          output_index = m_db->get_output_key(0, i);
 
         // call to the passed boost visitor to grab the public key for the output
         if (!vis.handle_output(output_index.unlock_time, output_index.pubkey, output_index.commitment))
@@ -1128,15 +1092,6 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
     money_in_use += o.amount;
   partial_block_reward = false;
 
-  if (version == 3) {
-    for (auto &o: b.miner_tx.vout) {
-      if (!is_valid_decomposed_amount(o.amount)) {
-        MERROR_VER("miner tx output " << print_money(o.amount) << " is not a valid decomposed amount");
-        return false;
-      }
-    }
-  }
-
   std::vector<size_t> last_blocks_weights;
   get_last_n_blocks_weights(last_blocks_weights, CRYPTONOTE_REWARD_BLOCKS_WINDOW);
   if (!get_block_reward(epee::misc_utils::median(last_blocks_weights), cumulative_block_weight, already_generated_coins, base_reward, version))
@@ -1298,13 +1253,13 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
 
   std::vector<crypto::hash> txhs;
   m_tx_pool.get_transaction_hashes(txhs);
-  if (m_db->height() != 0 && std::find(txhs.begin(), txhs.end(), get_transaction_hash(trust_tx)) == txhs.end())
+  if (m_db->height() >= TRUST_TX_ACTIVATE_HEIGHT && std::find(txhs.begin(), txhs.end(), get_transaction_hash(trust_tx)) == txhs.end())
   {
     LOG_PRINT_L1("Creating block template: error: Trust transaction not in block");
     return false;
   }
   b.trust_tx = trust_tx;
-  //Do not add the weight of the trust transaction which is in the block header.
+  //Do not add the weight of trust transaction which is in the block header.
   //Just add the weight of the trust transaction which is in the transaction pool.
 
   size_t txs_weight;
@@ -1375,7 +1330,7 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
    */
   //make blocks coin-base tx looks close to real coinbase tx to get truthful blob weight
   uint8_t hf_version = m_hardfork->get_current_version();
-  size_t max_outs = hf_version >= 4 ? 1 : 11;
+  size_t max_outs = 11;
   bool r = construct_miner_tx(height, median_weight, already_generated_coins, txs_weight, fee, miner_address, b.miner_tx, ex_nonce, max_outs, hf_version);
   CHECK_AND_ASSERT_MES(r, false, "Failed to construct miner tx, first chance");
   size_t cumulative_weight = txs_weight + get_transaction_weight(b.miner_tx);
@@ -1428,7 +1383,7 @@ bool Blockchain::create_block_template(block& b, const account_public_address& m
     MDEBUG("Creating block template: miner tx weight " << coinbase_weight <<
         ", cumulative weight " << cumulative_weight << " is now good");
 #endif
-    if (m_db->height() != 0 && std::find(b.tx_hashes.begin(), b.tx_hashes.end(), get_transaction_hash(b.trust_tx)) == b.tx_hashes.end())
+    if (m_db->height() >= TRUST_TX_ACTIVATE_HEIGHT && std::find(b.tx_hashes.begin(), b.tx_hashes.end(), get_transaction_hash(b.trust_tx)) == b.tx_hashes.end())
     {
       //LOG_ERROR("Creating block template: error: Couldn't find trust transaction in block");
       continue;
@@ -1814,7 +1769,7 @@ bool Blockchain::get_outs(const COMMAND_RPC_GET_OUTPUTS_BIN::request& req, COMMA
     for (const auto &i: req.outputs)
     {
       // get tx_hash, tx_out_index from DB
-      const output_data_t od = m_db->get_output_key(i.amount, i.index);
+      const output_data_t od = m_db->get_output_key(0, i.index);
       tx_out_index toi = m_db->get_output_tx_and_index(i.amount, i.index);
       bool unlocked = is_tx_spendtime_unlocked(m_db->get_tx_unlock_time(toi.first));
 
@@ -1844,9 +1799,9 @@ bool Blockchain::get_output_distribution(uint64_t amount, uint64_t from_height, 
   {
     switch (m_nettype)
     {
-      case STAGENET: start_height = stagenet_hard_forks[3].height; break;
-      case TESTNET: start_height = testnet_hard_forks[3].height; break;
-      case MAINNET: start_height = mainnet_hard_forks[3].height; break;
+      case STAGENET: start_height = stagenet_hard_forks[0].height; break;
+      case TESTNET: start_height = testnet_hard_forks[0].height; break;
+      case MAINNET: start_height = mainnet_hard_forks[0].height; break;
       default: return false;
     }
   }
@@ -2372,67 +2327,43 @@ bool Blockchain::check_tx_outputs(const transaction& tx, tx_verification_context
 
   const uint8_t hf_version = m_hardfork->get_current_version();
 
-  // from hard fork 2, we forbid dust and compound outputs
-  if (hf_version >= 2) {
-    for (auto &o: tx.vout) {
-      if (tx.version == 1)
-      {
-        if (!is_valid_decomposed_amount(o.amount)) {
-          tvc.m_invalid_output = true;
-          return false;
-        }
+  for (auto &o: tx.vout) {
+    if (tx.version == 1)
+    {
+      if (!is_valid_decomposed_amount(o.amount)) {
+        tvc.m_invalid_output = true;
+        return false;
       }
     }
   }
 
   // in a v2 tx, all outputs must have 0 amount
-  if (hf_version >= 3) {
-    if (tx.version >= 2) {
-      for (auto &o: tx.vout) {
-        if (o.amount != 0) {
-          tvc.m_invalid_output = true;
-          return false;
-        }
-      }
-    }
-  }
-
-  // from v4, forbid invalid pubkeys
-  if (hf_version >= 4) {
-    for (const auto &o: tx.vout) {
-      if (o.target.type() == typeid(txout_to_key)) {
-        const txout_to_key& out_to_key = boost::get<txout_to_key>(o.target);
-        if (!crypto::check_key(out_to_key.key)) {
-          tvc.m_invalid_output = true;
-          return false;
-        }
-      }
-    }
-  }
-
-  // from v8, allow bulletproofs
-  if (hf_version < 8) {
-    if (tx.version >= 2) {
-      const bool bulletproof = rct::is_rct_bulletproof(tx.rct_signatures.type);
-      if (bulletproof || !tx.rct_signatures.p.bulletproofs.empty())
-      {
-        MERROR_VER("Bulletproofs are not allowed before v8");
+  if (tx.version >= 2) {
+    for (auto &o: tx.vout) {
+      if (o.amount != 0) {
         tvc.m_invalid_output = true;
         return false;
       }
     }
   }
 
-  // from v9, forbid borromean range proofs
-  if (hf_version > 8) {
-    if (tx.version >= 2) {
-      const bool borromean = rct::is_rct_borromean(tx.rct_signatures.type);
-      if (borromean)
-      {
-        MERROR_VER("Borromean range proofs are not allowed after v8");
+  for (const auto &o: tx.vout) {
+    if (o.target.type() == typeid(txout_to_key)) {
+      const txout_to_key& out_to_key = boost::get<txout_to_key>(o.target);
+      if (!crypto::check_key(out_to_key.key)) {
         tvc.m_invalid_output = true;
         return false;
       }
+    }
+  }
+
+  if (tx.version >= 2) {
+    const bool borromean = rct::is_rct_borromean(tx.rct_signatures.type);
+    if (borromean)
+    {
+      MERROR_VER("Borromean range proofs are not allowed");
+      tvc.m_invalid_output = true;
+      return false;
     }
   }
 
@@ -2540,11 +2471,11 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
 
   // from hard fork 2, we require mixin at least 2 unless one output cannot mix with 2 others
   // if one output cannot mix with 2 others, we accept at most 1 output that can mix
-  if (hf_version >= 2)
   {
     size_t n_unmixable = 0, n_mixable = 0;
     size_t mixin = std::numeric_limits<size_t>::max();
-    const size_t min_mixin = hf_version >= HF_VERSION_MIN_MIXIN_10 ? 10 : hf_version >= HF_VERSION_MIN_MIXIN_6 ? 6 : hf_version >= HF_VERSION_MIN_MIXIN_4 ? 4 : 2;
+    //const size_t min_mixin = hf_version >= HF_VERSION_MIN_MIXIN_10 ? 10 : hf_version >= HF_VERSION_MIN_MIXIN_6 ? 6 : hf_version >= HF_VERSION_MIN_MIXIN_4 ? 4 : 2;
+    const size_t min_mixin = 10;
     for (const auto& txin : tx.vin)
     {
       // non txin_to_key inputs will be rejected below
@@ -2573,7 +2504,8 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       }
     }
 
-    if (((hf_version == HF_VERSION_MIN_MIXIN_10 || hf_version == HF_VERSION_MIN_MIXIN_10+1) && mixin != 10) || (hf_version >= HF_VERSION_MIN_MIXIN_10+2 && mixin > 10))
+    //if (((hf_version == HF_VERSION_MIN_MIXIN_10 || hf_version == HF_VERSION_MIN_MIXIN_10+1) && mixin != 10) || (hf_version >= HF_VERSION_MIN_MIXIN_10+2 && mixin > 10))
+    if (tx.version != 1 && mixin != 10)//TEMP
     {
       MERROR_VER("Tx " << get_transaction_hash(tx) << " has invalid ring size (" << (mixin + 1) << "), it should be 11");
       tvc.m_low_mixin = true;
@@ -2597,14 +2529,14 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
     }
 
     // min/max tx version based on HF, and we accept v1 txes if having a non mixable
-    const size_t max_tx_version = (hf_version <= 3) ? 1 : 2;
+    const size_t max_tx_version = 2;
     if (tx.version > max_tx_version)
     {
       MERROR_VER("transaction version " << (unsigned)tx.version << " is higher than max accepted version " << max_tx_version);
       tvc.m_verifivation_failed = true;
       return false;
     }
-    const size_t min_tx_version = (n_unmixable > 0 ? 1 : (hf_version >= HF_VERSION_ENFORCE_RCT) ? 2 : 1);
+    const size_t min_tx_version = 1;
     if (tx.version < min_tx_version)
     {
       MERROR_VER("transaction version " << (unsigned)tx.version << " is lower than min accepted version " << min_tx_version);
@@ -2614,7 +2546,6 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
   }
 
   // from v7, sorted ins
-  if (hf_version >= 7) {
     const crypto::key_image *last_key_image = NULL;
     for (size_t n = 0; n < tx.vin.size(); ++n)
     {
@@ -2631,7 +2562,7 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
         last_key_image = &in_to_key.k_image;
       }
     }
-  }
+
   auto it = m_check_txin_table.find(tx_prefix_hash);
   if(it == m_check_txin_table.end())
   {
@@ -2895,22 +2826,6 @@ bool Blockchain::check_tx_inputs(transaction& tx, tx_verification_context &tvc, 
       MERROR_VER("Unsupported rct type: " << rv.type);
       return false;
     }
-
-    // for bulletproofs, check they're only multi-output after v8
-    if (rct::is_rct_bulletproof(rv.type))
-    {
-      if (hf_version < 8)
-      {
-        for (const rct::Bulletproof &proof: rv.p.bulletproofs)
-        {
-          if (proof.V.size() > 1)
-          {
-            MERROR_VER("Multi output bulletproofs are invalid before v8");
-            return false;
-          }
-        }
-      }
-    }
   }
   return true;
 }
@@ -2950,34 +2865,12 @@ uint64_t Blockchain::get_dynamic_base_fee(uint64_t block_reward, size_t median_b
     median_block_weight = min_block_weight;
   uint64_t hi, lo;
 
-  if (version >= HF_VERSION_PER_BYTE_FEE)
-  {
-    lo = mul128(block_reward, DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT, &hi);
-    div128_32(hi, lo, min_block_weight, &hi, &lo);
-    div128_32(hi, lo, median_block_weight, &hi, &lo);
-    assert(hi == 0);
-    lo /= 5;
-    return lo;
-  }
-
-  const uint64_t fee_base = version >= 5 ? DYNAMIC_FEE_PER_KB_BASE_FEE_V5 : DYNAMIC_FEE_PER_KB_BASE_FEE;
-
-  uint64_t unscaled_fee_base = (fee_base * min_block_weight / median_block_weight);
-  lo = mul128(unscaled_fee_base, block_reward, &hi);
-  static_assert(DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD % 1000000 == 0, "DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD must be divisible by 1000000");
-  static_assert(DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD / 1000000 <= std::numeric_limits<uint32_t>::max(), "DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD is too large");
-
-  // divide in two steps, since the divisor must be 32 bits, but DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD isn't
-  div128_32(hi, lo, DYNAMIC_FEE_PER_KB_BASE_BLOCK_REWARD / 1000000, &hi, &lo);
-  div128_32(hi, lo, 1000000, &hi, &lo);
+  lo = mul128(block_reward, DYNAMIC_FEE_REFERENCE_TRANSACTION_WEIGHT, &hi);
+  div128_32(hi, lo, min_block_weight, &hi, &lo);
+  div128_32(hi, lo, median_block_weight, &hi, &lo);
   assert(hi == 0);
-
-  // quantize fee up to 8 decimals
-  uint64_t mask = get_fee_quantization_mask();
-  uint64_t qlo = (lo + mask - 1) / mask * mask;
-  MDEBUG("lo " << print_money(lo) << ", qlo " << print_money(qlo) << ", mask " << mask);
-
-  return qlo;
+  lo /= 5;
+  return lo;
 }
 
 //------------------------------------------------------------------
@@ -2988,41 +2881,19 @@ bool Blockchain::check_fee(size_t tx_weight, uint64_t fee) const
   uint64_t median = 0;
   uint64_t already_generated_coins = 0;
   uint64_t base_reward = 0;
-  if (version >= HF_VERSION_DYNAMIC_FEE)
-  {
-    median = m_current_block_cumul_weight_limit / 2;
-    already_generated_coins = m_db->height() ? m_db->get_block_already_generated_coins(m_db->height() - 1) : 0;
-    if (!get_block_reward(median, 1, already_generated_coins, base_reward, version))
-      return false;
-  }
+
+  median = m_current_block_cumul_weight_limit / 2;
+  already_generated_coins = m_db->height() ? m_db->get_block_already_generated_coins(m_db->height() - 1) : 0;
+  if (!get_block_reward(median, 1, already_generated_coins, base_reward, version))
+    return false;
 
   uint64_t needed_fee;
-  if (version >= HF_VERSION_PER_BYTE_FEE)
-  {
-    uint64_t fee_per_byte = get_dynamic_base_fee(base_reward, median, version);
-    MDEBUG("Using " << print_money(fee_per_byte) << "/byte fee");
-    needed_fee = tx_weight * fee_per_byte;
-    // quantize fee up to 8 decimals
-    const uint64_t mask = get_fee_quantization_mask();
-    needed_fee = (needed_fee + mask - 1) / mask * mask;
-  }
-  else
-  {
-    uint64_t fee_per_kb;
-    if (version < HF_VERSION_DYNAMIC_FEE)
-    {
-      fee_per_kb = FEE_PER_KB;
-    }
-    else
-    {
-      fee_per_kb = get_dynamic_base_fee(base_reward, median, version);
-    }
-    MDEBUG("Using " << print_money(fee_per_kb) << "/kB fee");
-
-    needed_fee = tx_weight / 1024;
-    needed_fee += (tx_weight % 1024) ? 1 : 0;
-    needed_fee *= fee_per_kb;
-  }
+  uint64_t fee_per_byte = get_dynamic_base_fee(base_reward, median, version);
+  MDEBUG("Using " << print_money(fee_per_byte) << "/byte fee");
+  needed_fee = tx_weight * fee_per_byte;
+  // quantize fee up to 8 decimals
+  const uint64_t mask = get_fee_quantization_mask();
+  needed_fee = (needed_fee + mask - 1) / mask * mask;
 
   if (fee < needed_fee - needed_fee / 50) // keep a little 2% buffer on acceptance - no integer overflow
   {
@@ -3036,9 +2907,6 @@ bool Blockchain::check_fee(size_t tx_weight, uint64_t fee) const
 uint64_t Blockchain::get_dynamic_base_fee_estimate(uint64_t grace_blocks) const
 {
   const uint8_t version = get_current_hard_fork_version();
-
-  if (version < HF_VERSION_DYNAMIC_FEE)
-    return FEE_PER_KB;
 
   if (grace_blocks >= CRYPTONOTE_REWARD_BLOCKS_WINDOW)
     grace_blocks = CRYPTONOTE_REWARD_BLOCKS_WINDOW - 1;
@@ -3063,7 +2931,7 @@ uint64_t Blockchain::get_dynamic_base_fee_estimate(uint64_t grace_blocks) const
   }
 
   uint64_t fee = get_dynamic_base_fee(base_reward, median, version);
-  const bool per_byte = version < HF_VERSION_PER_BYTE_FEE;
+  const bool per_byte = true;
   MDEBUG("Estimating " << grace_blocks << "-block fee at " << print_money(fee) << "/" << (per_byte ? "byte" : "kB"));
   return fee;
 }
@@ -3405,7 +3273,7 @@ leave:
   }
 
   // check if trust transaction is in block
-  if (m_db->height() != 0 && std::find(bl.tx_hashes.begin(), bl.tx_hashes.end(), get_transaction_hash(bl.trust_tx)) == bl.tx_hashes.end())
+  if (m_db->height() >= TRUST_TX_ACTIVATE_HEIGHT && std::find(bl.tx_hashes.begin(), bl.tx_hashes.end(), get_transaction_hash(bl.trust_tx)) == bl.tx_hashes.end())
   {
     MERROR_VER("Block with id: " << id << " Trust transaction not in block");
     bvc.m_verifivation_failed = true;
@@ -3541,7 +3409,7 @@ leave:
     goto leave;
   }
 
-  if (m_db->height() != 0 && m_db->height() != 1)
+  if (m_db->height() >= TRUST_TX_ACTIVATE_HEIGHT)
   {
     if(!validate_trust_transaction(bl))
     {

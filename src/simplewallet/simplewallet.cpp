@@ -783,11 +783,11 @@ bool simple_wallet::print_fee_info(const std::vector<std::string> &args/* = std:
 {
   if (!try_connect_to_daemon())
     return true;
-  const bool per_byte = m_wallet->use_fork_rules(HF_VERSION_PER_BYTE_FEE);
+  const bool per_byte = true;
   const uint64_t base_fee = m_wallet->get_base_fee();
-  const char *base = per_byte ? "byte" : "kB";
-  const uint64_t typical_size = per_byte ? 2500 : 13;
-  const uint64_t size_granularity = per_byte ? 1 : 1024;
+  const char *base = "byte";
+  const uint64_t typical_size = 2500;
+  const uint64_t size_granularity = 1;
   message_writer() << (boost::format(tr("Current fee is %s %s per %s")) % print_money(base_fee) % cryptonote::get_unit(cryptonote::get_default_decimal_point()) % base).str();
 
   std::vector<uint64_t> fees;
@@ -4110,7 +4110,10 @@ bool simple_wallet::start_mining(const std::vector<std::string>& args)
 
   SCOPED_WALLET_UNLOCK();
   try {
-    m_wallet->prepare_for_mining(m_current_subaddress_account, m_wallet->is_trusted_daemon());
+    if (m_wallet->get_blockchain_current_height() >= TRUST_TX_ACTIVATE_HEIGHT)
+    {
+      m_wallet->prepare_for_mining(m_current_subaddress_account, m_wallet->is_trusted_daemon());
+    }
   }
   catch (std::exception &e)
   {
@@ -4142,6 +4145,21 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
   {
     fail_msg_writer() << tr("wallet is null");
     return true;
+  }
+
+  try
+  {
+    m_wallet->stop_mining();
+  }
+  catch (const std::exception& e)
+  {
+    LOG_PRINT_L1("Trust transaction was not removed from the transaction pool, but this should not be a problem");
+    handle_transfer_exception(std::current_exception(), m_wallet->is_trusted_daemon());
+  }
+  catch (...)
+  {
+    LOG_ERROR("Unknown error");
+    fail_msg_writer() << tr("unknown error");
   }
 
   COMMAND_RPC_STOP_MINING::request req;
